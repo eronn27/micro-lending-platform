@@ -40,6 +40,13 @@ const router = createRouter({
             component: () => import('../pages/clients/EditClient.vue'), // Future feature
             meta: { requiresAuth: true }
         },
+        // NEW: Payment Management Route
+        {
+            path: '/payments',
+            name: 'PaymentManagement',
+            component: () => import('../pages/payments/PaymentManagement.vue'),
+            meta: { requiresAuth: true }
+        },
         {
             path: '/',
             redirect: '/dashboard'

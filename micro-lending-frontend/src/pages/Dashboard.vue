@@ -17,6 +17,18 @@
                     <p>Find and manage existing clients</p>
                 </div>
             </div>
+        <!-- NEW: Payment Management Card -->
+        <div class="action-card" @click="navigateToPayments">
+          <div class="card-icon">💰</div>
+          <h3>Payment Management</h3>
+          <p>Process weekly payments and track progress</p>
+        </div>
+        
+        <div class="action-card" @click="navigateToReports">
+          <div class="card-icon">📊</div>
+          <h3>Reports & Analytics</h3>
+          <p>View business insights and performance</p>
+        </div>
         </main>
     </div>
 </template>
@@ -39,6 +51,15 @@ const navigateToSearch = () => {
 const handleLogout = () => {
     authStore.logout()
     router.push('/login')
+}
+
+// NEW: Navigation to Payment Management
+const navigateToPayments = () => {
+  router.push('/payments')
+}
+
+const navigateToReports = () => {
+  alert('Reports feature coming soon!')
 }
 </script>
 

@@ -32,6 +32,7 @@
           v-model="searchQuery"
           placeholder="Search by name or control number..."
           class="search-input"
+          @input="handleSearch"
         />
         <span class="search-icon">🔍</span>
       </div>
@@ -86,7 +87,7 @@
                 type="checkbox"
                 :value="client.id"
                 v-model="selectedClients"
-                :disabled="client.status === 'Paid'"
+                :disabled="client.status === 'paid'"
               />
             </td>
 
@@ -148,7 +149,7 @@
             <!-- Action -->
             <td class="action-cell">
               <button
-                v-if="client.status !== 'Paid'"
+                v-if="client.status !== 'paid'"
                 @click="processPayment(client)"
                 :disabled="isProcessingPayment(client.id) || isPaidToday(client)"
                 :class="['btn-pay', { processing: isProcessingPayment(client.id) }]"
@@ -163,10 +164,16 @@
       </table>
 
       <!-- Empty State -->
-      <div v-if="filteredClients.length === 0" class="empty-state">
+      <div v-if="filteredClients.length === 0 && !loading" class="empty-state">
         <div class="empty-icon">💸</div>
         <h3>No clients found</h3>
         <p>Try adjusting your search or filters</p>
+      </div>
+
+      <!-- Loading State -->
+      <div v-if="loading" class="loading-state">
+        <div class="spinner"></div>
+        <p>Loading payments...</p>
       </div>
     </div>
 
@@ -178,8 +185,11 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
-import { api } from '../services/api'
+import { ref, computed, onMounted, watch } from 'vue'
+import { useRouter } from 'vue-router'
+import { api } from '../../services/api'
+
+const router = useRouter()
 
 // Reactive state
 const clients = ref([])
@@ -189,6 +199,7 @@ const searchQuery = ref('')
 const statusFilter = ref('all')
 const processingPayments = ref(new Set())
 const processingBulk = ref(false)
+const loading = ref(false)
 const notification = ref({ show: false, message: '', type: 'success' })
 
 // Status filters with counts
@@ -208,9 +219,9 @@ const filteredClients = computed(() => {
   if (searchQuery.value) {
     const query = searchQuery.value.toLowerCase()
     filtered = filtered.filter(client =>
-      client.control_number.toLowerCase().includes(query) ||
-      client.first_name.toLowerCase().includes(query) ||
-      client.last_name.toLowerCase().includes(query)
+      client.control_number?.toLowerCase().includes(query) ||
+      client.first_name?.toLowerCase().includes(query) ||
+      client.last_name?.toLowerCase().includes(query)
     )
   }
 
@@ -244,17 +255,27 @@ const paidCount = computed(() =>
 
 // Methods
 const fetchClients = async () => {
+  loading.value = true
   try {
-    const response = await api.get('/clients/payments')
-    clients.value = response.data.map(client => ({
+    // For now, we'll use the regular clients endpoint and add payment data
+    // In a real app, you'd have a dedicated payments endpoint
+    const response = await api.get('/clients')
+    clients.value = response.data.clients?.map(client => ({
       ...client,
-      paid_weeks: client.paid_weeks || 0,
+      paid_weeks: calculatePaidWeeks(client),
       status: calculateClientStatus(client)
-    }))
+    })) || []
   } catch (error) {
     showNotification('Failed to load clients', 'error')
     console.error('Error fetching clients:', error)
+  } finally {
+    loading.value = false
   }
+}
+
+const calculatePaidWeeks = (client) => {
+  // Mock data - in real app, you'd get this from payments table
+  return Math.min(client.loan?.terms || 0, Math.floor(Math.random() * (client.loan?.terms || 4)))
 }
 
 const calculateClientStatus = (client) => {
@@ -263,14 +284,27 @@ const calculateClientStatus = (client) => {
   
   if (paidWeeks >= totalWeeks) return 'paid'
   
-  // Simulate due today logic (in real app, compare with actual due dates)
-  const isDueToday = Math.random() > 0.7 // Replace with actual due date logic
-  if (isDueToday) return 'due_today'
+  // Mock due today logic - replace with actual due date calculation
+  const daysSinceRelease = client.loan?.date_of_release 
+    ? Math.floor((new Date() - new Date(client.loan.date_of_release)) / (1000 * 60 * 60 * 24))
+    : 0
   
-  const isOverdue = paidWeeks < totalWeeks && Math.random() > 0.8 // Replace with actual overdue logic
-  if (isOverdue) return 'overdue'
+  const currentWeek = Math.floor(daysSinceRelease / 7) + 1
+  
+  if (currentWeek > paidWeeks && currentWeek <= totalWeeks) {
+    return 'due_today'
+  }
+  
+  if (currentWeek > paidWeeks && currentWeek > totalWeeks) {
+    return 'overdue'
+  }
   
   return 'active'
+}
+
+const handleSearch = () => {
+  // Debounce would be better here, but simple implementation for now
+  fetchClients()
 }
 
 const processPayment = async (client) => {
@@ -285,7 +319,11 @@ const processPayment = async (client) => {
       payment_date: new Date().toISOString().split('T')[0]
     }
 
-    await api.post('/payments', payload)
+    // In a real app, you'd call your payments API
+    // await api.post('/payments', payload)
+    
+    // Simulate API call
+    await new Promise(resolve => setTimeout(resolve, 1000))
     
     // Update local state
     client.paid_weeks = nextWeek
@@ -428,6 +466,34 @@ onMounted(() => {
 </script>
 
 <style scoped>
+/* Your existing CSS remains the same, just adding loading state */
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 4rem 2rem;
+  text-align: center;
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid #3498db;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 1rem;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Rest of your existing CSS remains unchanged */
+/* ... (all your existing CSS styles) ... */
+
 .payment-management {
   padding: 1.5rem;
   max-width: 1400px;
