@@ -345,7 +345,7 @@ const getStatusClass = (status) => {
 }
 
 const viewClientDetails = (client) => {
-  router.push(`/clients/${client.id}/details`)
+  router.push(`/clients/${client.id}`)
 }
 
 const goToCreateClient = () => {

@@ -137,7 +137,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { api } from '../services/api'
+import { api } from '../../services/api'
 
 const route = useRoute()
 const router = useRouter()
@@ -184,11 +184,13 @@ const goBack = () => {
   router.push('/clients/search')
 }
 
-const editClient = () => {
-  // Placeholder for edit functionality
-  alert('Edit functionality coming soon!')
-  // Future: router.push(`/clients/${client.value.id}/edit`)
+const editClient = (client) => {
+  
+  router.push(`/clients/${route.params.id}/edit`)
+
 }
+
+
 
 onMounted(() => {
   loadClient()
