@@ -142,7 +142,7 @@ func (r *ClientRepository) CreateClientWithRelatedData(clientData *models.Client
 // FindByID finds a client by ID
 func (r *ClientRepository) FindByID(id uint) (*models.Client, error) {
     var client models.Client
-    result := r.db.First(&client, id)
+    result := r.db.Preload("Loans").First(&client, id)
     if result.Error != nil {
         return nil, result.Error
     }
@@ -212,18 +212,18 @@ func (r *ClientRepository) FindWithDetails(id uint) (*models.ClientWithRelatedDa
 // FindByControlNumber finds a client by control number
 func (r *ClientRepository) FindByControlNumber(controlNumber string) (*models.Client, error) {
     var client models.Client
-    result := r.db.Where("control_number = ?", controlNumber).First(&client)
+    result := r.db.Preload("Loans").Where("control_number = ?", controlNumber).First(&client)
     if result.Error != nil {
         return nil, result.Error
     }
     return &client, nil
 }
 
-// FindAll retrieves all clients with pagination and search
+// FindAll retrieves all clients with pagination and search - FIXED TO INCLUDE LOANS
 func (r *ClientRepository) FindAll(offset, limit int, search string) ([]models.Client, error) {
     var clients []models.Client
     
-    query := r.db.Model(&models.Client{})
+    query := r.db.Preload("Loans") // ADD THIS LINE TO PRELOAD LOANS
     
     // Add search filter if provided
     if search != "" {
@@ -245,13 +245,13 @@ func (r *ClientRepository) FindAll(offset, limit int, search string) ([]models.C
     return clients, nil
 }
 
-// Search searches clients with more comprehensive criteria
+// Search searches clients with more comprehensive criteria - FIXED TO INCLUDE LOANS
 func (r *ClientRepository) Search(query string, offset, limit int) ([]models.Client, error) {
     var clients []models.Client
     
     searchPattern := "%" + query + "%"
     
-    result := r.db.Where(`
+    result := r.db.Preload("Loans").Where(`
         first_name LIKE ? OR 
         last_name LIKE ? OR 
         control_number LIKE ? OR 

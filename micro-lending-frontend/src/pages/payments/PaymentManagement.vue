@@ -87,7 +87,7 @@
                 type="checkbox"
                 :value="client.id"
                 v-model="selectedClients"
-                :disabled="client.status === 'paid'"
+                :disabled="getClientStatus(client) === 'paid'"
               />
             </td>
 
@@ -103,29 +103,29 @@
 
             <!-- Date of Release -->
             <td class="date-release">
-              {{ formatDate(client.loan?.date_of_release) }}
+              {{ formatDate(getLoanField(client, 'date_of_release')) }}
             </td>
 
             <!-- Total Amount -->
             <td class="amount">
-              ₱{{ formatCurrency(client.loan?.total_amount) }}
+              ₱{{ formatCurrency(getLoanField(client, 'total_amount')) }}
             </td>
 
             <!-- Amortization -->
             <td class="amortization">
-              ₱{{ formatCurrency(client.loan?.ammortization) }}
+              ₱{{ formatCurrency(getLoanField(client, 'ammortization')) }}
             </td>
 
             <!-- Terms -->
             <td class="terms">
-              {{ client.loan?.terms }} weeks
+              {{ getLoanField(client, 'terms') || 0 }} weeks
             </td>
 
             <!-- Payment Progress -->
             <td class="progress-cell">
               <div class="progress-container">
                 <div class="progress-info">
-                  {{ client.paid_weeks || 0 }}/{{ client.loan?.terms }} weeks
+                  {{ getPaidWeeks(client) }}/{{ getLoanField(client, 'terms') || 0 }} weeks
                 </div>
                 <div class="progress-bar">
                   <div
@@ -149,7 +149,7 @@
             <!-- Action -->
             <td class="action-cell">
               <button
-                v-if="client.status !== 'paid'"
+                v-if="getClientStatus(client) !== 'paid'"
                 @click="processPayment(client)"
                 :disabled="isProcessingPayment(client.id) || isPaidToday(client)"
                 :class="['btn-pay', { processing: isProcessingPayment(client.id) }]"
@@ -202,6 +202,16 @@ const processingBulk = ref(false)
 const loading = ref(false)
 const notification = ref({ show: false, message: '', type: 'success' })
 
+// Helper function to get loan data from client (handles both array and object formats)
+const getLoanField = (client, field) => {
+  // Handle both array and object formats for loan data
+  if (client.loans && client.loans.length > 0) {
+    return client.loans[0][field]
+  }
+  // Fallback to direct loan object if exists
+  return client.loan ? client.loan[field] : null
+}
+
 // Status filters with counts
 const statusFilters = computed(() => [
   { label: 'All', value: 'all', count: clients.value.length },
@@ -227,44 +237,52 @@ const filteredClients = computed(() => {
 
   // Apply status filter
   if (statusFilter.value !== 'all') {
-    filtered = filtered.filter(client => client.status === statusFilter.value)
+    filtered = filtered.filter(client => getClientStatus(client) === statusFilter.value)
   }
 
   // Sort: Due Today first, then Overdue, then Active, then Paid
   return filtered.sort((a, b) => {
     const statusOrder = { due_today: 0, overdue: 1, active: 2, paid: 3 }
-    return statusOrder[a.status] - statusOrder[b.status]
+    return statusOrder[getClientStatus(a)] - statusOrder[getClientStatus(b)]
   })
 })
 
 const dueTodayCount = computed(() => 
-  clients.value.filter(client => client.status === 'due_today').length
+  clients.value.filter(client => getClientStatus(client) === 'due_today').length
 )
 
 const overdueCount = computed(() => 
-  clients.value.filter(client => client.status === 'overdue').length
+  clients.value.filter(client => getClientStatus(client) === 'overdue').length
 )
 
 const activeCount = computed(() => 
-  clients.value.filter(client => client.status === 'active').length
+  clients.value.filter(client => getClientStatus(client) === 'active').length
 )
 
 const paidCount = computed(() => 
-  clients.value.filter(client => client.status === 'paid').length
+  clients.value.filter(client => getClientStatus(client) === 'paid').length
 )
 
 // Methods
 const fetchClients = async () => {
   loading.value = true
   try {
-    // For now, we'll use the regular clients endpoint and add payment data
-    // In a real app, you'd have a dedicated payments endpoint
     const response = await api.get('/clients')
-    clients.value = response.data.clients?.map(client => ({
-      ...client,
-      paid_weeks: calculatePaidWeeks(client),
-      status: calculateClientStatus(client)
-    })) || []
+    console.log('Fetched clients with loans:', response.data.clients)
+    
+    // Map clients and calculate payment status
+    clients.value = response.data.clients?.map(client => {
+      const paidWeeks = calculatePaidWeeks(client)
+      const status = calculateClientStatus(client, paidWeeks)
+      
+      return {
+        ...client,
+        paid_weeks: paidWeeks,
+        status: status
+      }
+    }) || []
+    
+    console.log('Processed clients:', clients.value)
   } catch (error) {
     showNotification('Failed to load clients', 'error')
     console.error('Error fetching clients:', error)
@@ -274,25 +292,50 @@ const fetchClients = async () => {
 }
 
 const calculatePaidWeeks = (client) => {
-  // Mock data - in real app, you'd get this from payments table
-  return Math.min(client.loan?.terms || 0, Math.floor(Math.random() * (client.loan?.terms || 4)))
+  // Check if client has payments data
+  const loan = getLoanField(client, 'payments')
+  if (loan && Array.isArray(loan)) {
+    return loan.length
+  }
+  
+  // Check if client has direct payments array
+  if (client.payments && Array.isArray(client.payments)) {
+    return client.payments.length
+  }
+  
+  // Mock data for demo - in production, you'd get this from actual payments
+  const totalWeeks = getLoanField(client, 'terms') || 0
+  return Math.min(totalWeeks, Math.floor(Math.random() * (totalWeeks || 4)))
 }
 
-const calculateClientStatus = (client) => {
-  const totalWeeks = client.loan?.terms || 0
-  const paidWeeks = client.paid_weeks || 0
+const calculateClientStatus = (client, paidWeeks) => {
+  const totalWeeks = getLoanField(client, 'terms') || 0
+  const loanStatus = getLoanField(client, 'status')
   
-  if (paidWeeks >= totalWeeks) return 'paid'
+  // If loan status is explicitly set to "Paid", respect that
+  if (loanStatus === 'Paid' || paidWeeks >= totalWeeks) {
+    return 'paid'
+  }
   
-  // Mock due today logic - replace with actual due date calculation
-  const daysSinceRelease = client.loan?.date_of_release 
-    ? Math.floor((new Date() - new Date(client.loan.date_of_release)) / (1000 * 60 * 60 * 24))
-    : 0
+  // Calculate based on dates and payments
+  const dateOfRelease = getLoanField(client, 'date_of_release')
+  if (!dateOfRelease) return 'active'
   
+  const releaseDate = new Date(dateOfRelease)
+  const today = new Date()
+  
+  // Calculate weeks since release
+  const daysSinceRelease = Math.floor((today - releaseDate) / (1000 * 60 * 60 * 24))
   const currentWeek = Math.floor(daysSinceRelease / 7) + 1
   
   if (currentWeek > paidWeeks && currentWeek <= totalWeeks) {
-    return 'due_today'
+    // Check if it's due today (current week but not paid)
+    const daysInCurrentWeek = daysSinceRelease % 7
+    // Consider due if we're in the middle of the week (days 3-6)
+    if (daysInCurrentWeek >= 3 && daysInCurrentWeek <= 6) {
+      return 'due_today'
+    }
+    return 'active'
   }
   
   if (currentWeek > paidWeeks && currentWeek > totalWeeks) {
@@ -302,34 +345,67 @@ const calculateClientStatus = (client) => {
   return 'active'
 }
 
+const getClientStatus = (client) => {
+  return client.status || calculateClientStatus(client, client.paid_weeks || 0)
+}
+
+const getPaidWeeks = (client) => {
+  return client.paid_weeks || calculatePaidWeeks(client)
+}
+
 const handleSearch = () => {
-  // Debounce would be better here, but simple implementation for now
-  fetchClients()
+  // Simple search implementation - you could add debounce here
+  // The filteredClients computed property handles the actual filtering
 }
 
 const processPayment = async (client) => {
   processingPayments.value.add(client.id)
   
   try {
-    const nextWeek = (client.paid_weeks || 0) + 1
+    const nextWeek = getPaidWeeks(client) + 1
+    const paymentAmount = getLoanField(client, 'ammortization')
+    
     const payload = {
       client_id: client.id,
+      loan_id: getLoanField(client, 'id'), // Get the actual loan ID
       week_number: nextWeek,
-      amount_paid: client.loan?.ammortization,
-      payment_date: new Date().toISOString().split('T')[0]
+      amount_due: paymentAmount,
+      amount_paid: paymentAmount,
+      payment_date: new Date().toISOString().split('T')[0],
+      status: 'Paid',
+      payment_method: 'Cash' // Default, can be made configurable
     }
 
-    // In a real app, you'd call your payments API
+    console.log('Processing payment:', payload)
+    
+    // Call the payments API - you'll need to create this endpoint
     // await api.post('/payments', payload)
     
-    // Simulate API call
+    // For now, simulate API call
     await new Promise(resolve => setTimeout(resolve, 1000))
     
     // Update local state
     client.paid_weeks = nextWeek
-    client.status = calculateClientStatus(client)
+    client.status = calculateClientStatus(client, nextWeek)
     
-    showNotification(`Payment recorded for ${client.first_name} ${client.last_name}`)
+    // Update loan outstanding balance
+    const currentBalance = getLoanField(client, 'outstanding_balance') || 0
+    const newBalance = Math.max(0, currentBalance - paymentAmount)
+    
+    // Update the loan data in the client object
+    if (client.loans && client.loans.length > 0) {
+      client.loans[0].outstanding_balance = newBalance
+      if (nextWeek >= getLoanField(client, 'terms')) {
+        client.loans[0].status = 'Paid'
+      }
+    } else if (client.loan) {
+      client.loan.outstanding_balance = newBalance
+      if (nextWeek >= getLoanField(client, 'terms')) {
+        client.loan.status = 'Paid'
+      }
+    }
+    
+    showNotification(`Payment recorded for ${client.first_name} ${client.last_name} - Week ${nextWeek}`)
     
     // Remove from selection if it was selected
     const index = selectedClients.value.indexOf(client.id)
@@ -350,7 +426,7 @@ const processBulkPayments = async () => {
   try {
     const paymentPromises = selectedClients.value.map(clientId => {
       const client = clients.value.find(c => c.id === clientId)
-      if (client && client.status !== 'paid') {
+      if (client && getClientStatus(client) !== 'paid') {
         return processPayment(client)
       }
       return Promise.resolve()
@@ -369,7 +445,7 @@ const processBulkPayments = async () => {
 const toggleSelectAll = () => {
   if (selectAll.value) {
     selectedClients.value = filteredClients.value
-      .filter(client => client.status !== 'paid')
+      .filter(client => getClientStatus(client) !== 'paid')
       .map(client => client.id)
   } else {
     selectedClients.value = []
@@ -387,14 +463,15 @@ const setStatusFilter = (filter) => {
 
 const getRowClass = (client) => {
   const classes = []
-  if (client.status === 'due_today') classes.push('due-today-row')
-  if (client.status === 'overdue') classes.push('overdue-row')
+  const status = getClientStatus(client)
+  if (status === 'due_today') classes.push('due-today-row')
+  if (status === 'overdue') classes.push('overdue-row')
   if (selectedClients.value.includes(client.id)) classes.push('selected-row')
   return classes
 }
 
 const getStatusClass = (client) => {
-  return `status-${client.status}`
+  return `status-${getClientStatus(client)}`
 }
 
 const getStatusText = (client) => {
@@ -404,12 +481,12 @@ const getStatusText = (client) => {
     active: 'Active',
     paid: '🎉 Paid'
   }
-  return statusMap[client.status] || 'Active'
+  return statusMap[getClientStatus(client)] || 'Active'
 }
 
 const getProgressPercentage = (client) => {
-  const total = client.loan?.terms || 1
-  const paid = client.paid_weeks || 0
+  const total = getLoanField(client, 'terms') || 1
+  const paid = getPaidWeeks(client) || 0
   return (paid / total) * 100
 }
 
@@ -427,10 +504,12 @@ const isProcessingPayment = (clientId) => {
 
 const isPaidToday = (client) => {
   // Implement logic to check if client was already paid today
+  // This would check the actual payment records
   return false
 }
 
 const formatCurrency = (amount) => {
+  if (!amount && amount !== 0) return '0.00'
   return new Intl.NumberFormat('en-PH', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
@@ -439,7 +518,11 @@ const formatCurrency = (amount) => {
 
 const formatDate = (dateString) => {
   if (!dateString) return '-'
-  return new Date(dateString).toLocaleDateString('en-PH')
+  try {
+    return new Date(dateString).toLocaleDateString('en-PH')
+  } catch (error) {
+    return '-'
+  }
 }
 
 const showNotification = (message, type = 'success') => {
@@ -451,12 +534,18 @@ const showNotification = (message, type = 'success') => {
 
 // Watch for changes in filtered clients to update selectAll
 watch(filteredClients, (newFiltered) => {
-  const selectableClients = newFiltered.filter(client => client.status !== 'paid')
+  const selectableClients = newFiltered.filter(client => getClientStatus(client) !== 'paid')
   if (selectableClients.length > 0) {
     selectAll.value = selectedClients.value.length === selectableClients.length
   } else {
     selectAll.value = false
   }
+})
+
+// Watch for search query changes to refetch if needed
+watch(searchQuery, () => {
+  // If you want to refetch from server on search, do it here
+  // Otherwise, the computed filteredClients handles client-side filtering
 })
 
 // Lifecycle
@@ -466,7 +555,7 @@ onMounted(() => {
 </script>
 
 <style scoped>
-/* Your existing CSS remains the same, just adding loading state */
+/* Your existing CSS remains the same */
 .loading-state {
   display: flex;
   flex-direction: column;
@@ -492,15 +581,12 @@ onMounted(() => {
 }
 
 /* Rest of your existing CSS remains unchanged */
-/* ... (all your existing CSS styles) ... */
-
 .payment-management {
   padding: 1.5rem;
   max-width: 1400px;
   margin: 0 auto;
 }
 
-/* Header Styles */
 .page-header {
   display: flex;
   justify-content: space-between;
@@ -584,7 +670,6 @@ onMounted(() => {
   background: #4b5563;
 }
 
-/* Filters Section */
 .filters-section {
   display: flex;
   gap: 2rem;
@@ -659,7 +744,6 @@ onMounted(() => {
   font-weight: 600;
 }
 
-/* Table Styles */
 .table-container {
   background: white;
   border-radius: 12px;
@@ -692,7 +776,6 @@ onMounted(() => {
   border-bottom: none;
 }
 
-/* Row States */
 .due-today-row {
   background: #fffbeb !important;
   border-left: 4px solid #f59e0b;
@@ -713,7 +796,6 @@ onMounted(() => {
   50% { background-color: #fee2e2; }
 }
 
-/* Column Specific Styles */
 .checkbox-column {
   width: 40px;
   text-align: center;
@@ -736,7 +818,6 @@ onMounted(() => {
   color: #059669;
 }
 
-/* Progress Bar */
 .progress-container {
   display: flex;
   flex-direction: column;
@@ -763,7 +844,6 @@ onMounted(() => {
   transition: width 0.3s ease;
 }
 
-/* Status Badges */
 .status-badge {
   padding: 0.375rem 0.75rem;
   border-radius: 20px;
@@ -803,7 +883,6 @@ onMounted(() => {
   50% { opacity: 0.7; }
 }
 
-/* Action Buttons */
 .btn-pay {
   background: linear-gradient(135deg, #3b82f6, #1d4ed8);
   color: white;
@@ -839,7 +918,6 @@ onMounted(() => {
   font-size: 0.875rem;
 }
 
-/* Empty State */
 .empty-state {
   text-align: center;
   padding: 4rem 2rem;
@@ -861,7 +939,6 @@ onMounted(() => {
   font-size: 0.875rem;
 }
 
-/* Notifications */
 .notification {
   position: fixed;
   top: 2rem;
@@ -893,7 +970,6 @@ onMounted(() => {
   }
 }
 
-/* Responsive Design */
 @media (max-width: 1024px) {
   .payment-management {
     padding: 1rem;

@@ -151,33 +151,33 @@
                   {{ client.first_name }} {{ client.last_name }}
                 </td>
                 <td class="date-release">
-                  {{ formatDate(client.loans?.[0]?.date_of_release) }}
+                  {{ formatDate(getLoanField(client, 'date_of_release')) }}
                 </td>
                 <td class="total-amount">
-                  {{ formatCurrency(client.loans?.[0]?.total_amount) }}
+                  {{ formatCurrency(getLoanField(client, 'total_amount')) }}
                 </td>
                 <td class="ammortization">
-                  {{ formatCurrency(client.loans?.[0]?.ammortization) }}
+                  {{ formatCurrency(getLoanField(client, 'ammortization')) }}
                 </td>
                 <td class="terms">
-                  {{ client.loans?.[0]?.terms || 'N/A' }}
+                  {{ getLoanField(client, 'terms') || 'N/A' }}
                 </td>
                 <td class="mode">
-                  <span class="mode-badge">{{ client.loans?.[0]?.mode || 'N/A' }}</span>
+                  <span class="mode-badge">{{ getLoanField(client, 'mode') || 'N/A' }}</span>
                 </td>
                 <td class="outstanding-balance">
-                  {{ formatCurrency(client.loans?.[0]?.outstanding_balance) }}
+                  {{ formatCurrency(getLoanField(client, 'outstanding_balance')) }}
                 </td>
                 <td class="status">
-                  <span :class="['status-badge', getStatusClass(client.loans?.[0]?.status)]">
-                    {{ client.loans?.[0]?.status || 'N/A' }}
+                  <span :class="['status-badge', getStatusClass(getLoanField(client, 'status'))]">
+                    {{ getLoanField(client, 'status') || 'N/A' }}
                   </span>
                 </td>
                 <td class="due-date">
-                  {{ client.loans?.[0]?.due_date || 'N/A' }}
+                  {{ getLoanField(client, 'due_date') || 'N/A' }}
                 </td>
                 <td class="deductions">
-                  {{ client.loans?.[0]?.deductions || 'N/A' }}
+                  {{ getLoanField(client, 'deductions') || 'N/A' }}
                 </td>
                 <td class="contact-number">
                   {{ client.contact_number || 'N/A' }}
@@ -186,7 +186,7 @@
                   {{ truncateAddress(client.home_address) }}
                 </td>
                 <td class="amount-release">
-                  {{ formatCurrency(client.loans?.[0]?.amount_release) }}
+                  {{ formatCurrency(getLoanField(client, 'amount_release')) }}
                 </td>
               </tr>
             </tbody>
@@ -269,6 +269,15 @@ const hasActiveFilters = computed(() => {
 })
 
 // Methods
+const getLoanField = (client, field) => {
+  // Handle both array and object formats for loan data
+  if (client.loans && client.loans.length > 0) {
+    return client.loans[0][field]
+  }
+  // Fallback to direct loan object if exists
+  return client.loan ? client.loan[field] : null
+}
+
 const handleSearch = () => {
   currentPage.value = 1
   loadClients()
@@ -303,6 +312,12 @@ const loadClients = async () => {
     
     clients.value = response.data.clients
     totalClients.value = response.data.pagination.total
+    
+    // Debug log to check data structure
+    console.log('Clients data:', clients.value)
+    if (clients.value.length > 0) {
+      console.log('First client loan data:', clients.value[0].loans)
+    }
   } catch (err) {
     console.error('Error loading clients:', err)
     error.value = 'Failed to load clients. Please try again.'
@@ -314,7 +329,7 @@ const loadClients = async () => {
 }
 
 const formatCurrency = (amount) => {
-  if (!amount) return '₱0.00'
+  if (!amount && amount !== 0) return '₱0.00'
   return new Intl.NumberFormat('en-PH', {
     style: 'currency',
     currency: 'PHP',
@@ -324,8 +339,12 @@ const formatCurrency = (amount) => {
 
 const formatDate = (dateString) => {
   if (!dateString) return 'N/A'
-  const date = new Date(dateString)
-  return date.toLocaleDateString('en-PH')
+  try {
+    const date = new Date(dateString)
+    return date.toLocaleDateString('en-PH')
+  } catch (error) {
+    return 'N/A'
+  }
 }
 
 const truncateAddress = (address) => {
