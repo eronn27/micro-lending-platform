@@ -69,17 +69,23 @@ func main() {
         c.Next() // Continue to the next middleware/handler
     })
 
-    // Initialize repositories - these handle direct database operations
+
+    // Initialize repositories
     userRepo := repositories.NewUserRepository(db.DB)
     clientRepo := repositories.NewClientRepository(db.DB)
+    loanRepo := repositories.NewLoanRepository(db.DB)
+    paymentRepo := repositories.NewPaymentRepository(db.DB)
 
-    // Initialize services - these contain business logic and use repositories
+    // Initialize services
     authService := services.NewAuthService(userRepo)
     clientService := services.NewClientService(clientRepo)
+    loanService := services.NewLoanService(loanRepo)
+    paymentService := services.NewPaymentService(paymentRepo, loanRepo)
 
-    // MAJOR IMPROVEMENT: Centralized route configuration
-    // Now all routes are defined in handlers.SetupRoutes, making main.go cleaner
-    handlers.SetupRoutes(router, authService, clientService)
+
+
+    // Setup routes with all services
+    handlers.SetupRoutes(router, authService, clientService, loanService, paymentService)
 
     // Start the HTTP server on the configured port
     log.Printf("Server starting on port %s", cfg.ServerPort)

@@ -7,132 +7,118 @@ import (
 )
 
 // SetupRoutes initializes all API routes and groups them by version and resource
-// This centralizes route configuration and makes the API structure clear and maintainable
-func SetupRoutes(router *gin.Engine, authService *services.AuthService, clientService *services.ClientService) {
-    // Initialize handlers with their respective services
+func SetupRoutes(
+    router *gin.Engine, 
+    authService *services.AuthService, 
+    clientService *services.ClientService,
+    loanService *services.LoanService,
+    paymentService *services.PaymentService,
+) {
+    // Initialize handlers
     authHandler := NewAuthHandler(authService)
     clientHandler := NewClientHandler(clientService)
+    loanHandler := NewLoanHandler(loanService)
+    paymentHandler := NewPaymentHandler(paymentService)
 
-    // API v1 group - all routes under /api/v1 prefix
-    // Versioning allows for future API changes without breaking existing clients
+    // API v1 group
     v1 := router.Group("/api/v1")
     {
-        setupAuthRoutes(v1, authHandler)      // Authentication and user management routes
-        setupClientRoutes(v1, clientHandler)  // Client management routes
-        setupLoanRoutes(v1)                   // Loan management routes (placeholder for future)
-        setupReportRoutes(v1)                 // Reporting routes (placeholder for future)
+        setupAuthRoutes(v1, authHandler)
+        setupClientRoutes(v1, clientHandler)
+        setupLoanRoutes(v1, loanHandler)
+        setupPaymentRoutes(v1, paymentHandler)
+        setupReportRoutes(v1)
     }
 
-    // System routes (outside API versioning)
-    // These are infrastructure endpoints that shouldn't change with API versions
+    // System routes
     setupSystemRoutes(router)
 }
 
-// setupAuthRoutes configures all authentication and user management endpoints
+// setupAuthRoutes configures all authentication endpoints
 func setupAuthRoutes(rg *gin.RouterGroup, h *AuthHandler) {
-    // Auth group for all authentication-related endpoints
-    authe := rg.Group("/auth")
+    authGroup := rg.Group("/auth")
     {
-        // Public authentication endpoints (no authentication required)
-        authe.POST("/login", h.Login)          // User login - validates credentials and returns JWT
+        authGroup.POST("/login", h.Login)
+        authGroup.POST("/register", h.Register)
+        authGroup.POST("/refresh", h.RefreshToken)
         
-        // The following endpoints are placeholders for future implementation
-        authe.POST("/register", h.Register)    // User registration (future feature)
-        authe.POST("/refresh", h.RefreshToken) // Token refresh (future feature)
-        
-        // Protected authentication endpoints (require valid JWT)
-        // AuthMiddleware validates JWT tokens for all routes in this subgroup
-        protected := authe.Group("")
+        protected := authGroup.Group("")
         protected.Use(auth.AuthMiddleware())
         {
-            protected.GET("/me", h.GetCurrentUser)         // Get current authenticated user info
-            protected.PUT("/profile", h.UpdateProfile)     // Update user profile (future feature)
-            protected.PATCH("/password", h.ChangePassword) // Change user password (future feature)
-            protected.POST("/logout", h.Logout)            // Logout - token invalidation (future feature)
+            protected.GET("/me", h.GetCurrentUser)
+            protected.PUT("/profile", h.UpdateProfile)
+            protected.PATCH("/password", h.ChangePassword)
+            protected.POST("/logout", h.Logout)
         }
     }
 }
 
 // setupClientRoutes configures all client management endpoints
-// Clients are the core entity in the micro-lending platform
 func setupClientRoutes(rg *gin.RouterGroup, h *ClientHandler) {
-    // Clients group for all client-related operations
     clients := rg.Group("/clients")
-    clients.Use(auth.AuthMiddleware()) // All client routes require authentication
+    clients.Use(auth.AuthMiddleware())
     
     {
-        // Client CRUD operations
-        clients.GET("", h.GetAllClients)                           // Get paginated list of clients with search
-        clients.POST("", h.CreateClient)                           // Create new client record with complete data
-        clients.POST("/simple", h.CreateSimpleClient)              // Create simple client (backward compatibility)
-        clients.GET("/:id", h.GetClientByID)                       // Get specific client by ID
-        clients.GET("/:id/details", h.GetClientWithDetails)        // Get client with full related data
-        clients.PUT("/:id", h.UpdateClient)                        // Update client information
-        clients.DELETE("/:id", h.DeleteClient)                     // Soft delete client
-        clients.PATCH("/:id/restore", h.RestoreClient)             // Restore soft-deleted client (future feature)
+        clients.GET("", h.GetAllClients)
+        clients.POST("", h.CreateClient)
+        clients.POST("/simple", h.CreateSimpleClient)
+        clients.GET("/:id", h.GetClientByID)
+        clients.GET("/:id/details", h.GetClientWithDetails)
+        clients.PUT("/:id", h.UpdateClient)
+        clients.DELETE("/:id", h.DeleteClient)
+        clients.PATCH("/:id/restore", h.RestoreClient)
         
-        // Client search and utility endpoints
-        clients.GET("/search", h.SearchClients)                    // Advanced client search
-        clients.GET("/check-duplicate", h.CheckDuplicate)          // Check for potential duplicate clients
-        clients.GET("/control-number/:controlNumber", h.GetClientByControlNumber) // Get client by control number
+        clients.GET("/search", h.SearchClients)
+        clients.GET("/check-duplicate", h.CheckDuplicate)
+        clients.GET("/control-number/:controlNumber", h.GetClientByControlNumber)
         
-        // Client statistics and reporting
-        clients.GET("/stats", h.GetClientStats)                    // Get client statistics dashboard data
-        clients.GET("/export", h.ExportClients)                    // Export clients data
+        clients.GET("/stats", h.GetClientStats)
+        clients.GET("/export", h.ExportClients)
         
-        // Bulk operations
-        clients.POST("/bulk", h.BulkCreateClients)                 // Bulk create multiple clients
+        clients.POST("/bulk", h.BulkCreateClients)
     }
 }
 
-// setupLoanRoutes configures loan management endpoints (placeholder for future implementation)
-// Loans represent the financial transactions between the platform and clients
-func setupLoanRoutes(rg *gin.RouterGroup) {
+// setupLoanRoutes configures loan management endpoints
+func setupLoanRoutes(rg *gin.RouterGroup, h *LoanHandler) {
     loans := rg.Group("/loans")
-    loans.Use(auth.AuthMiddleware()) // All loan routes will require authentication
+    loans.Use(auth.AuthMiddleware())
     
     {
-        // Placeholder routes - to be implemented in future iterations
-        // Using 501 status code (Not Implemented) to indicate planned functionality
-        loans.GET("", func(c *gin.Context) {
-            c.JSON(501, gin.H{
-                "message": "Get loans endpoint - coming soon",
-                "status":  "not_implemented",
-            })
-        })
+        loans.GET("", h.GetAllLoans)
+        loans.POST("", h.CreateLoan)
+        loans.GET("/:id", h.GetLoanByID)
+        loans.PUT("/:id", h.UpdateLoan)
+        loans.DELETE("/:id", h.DeleteLoan)
         
-        loans.POST("", func(c *gin.Context) {
-            c.JSON(501, gin.H{
-                "message": "Create loan endpoint - coming soon", 
-                "status":  "not_implemented",
-            })
-        })
-        
-        loans.GET("/:id", func(c *gin.Context) {
-            c.JSON(501, gin.H{
-                "message": "Get loan by ID endpoint - coming soon",
-                "status":  "not_implemented",
-            })
-        })
-        
-        loans.PUT("/:id", func(c *gin.Context) {
-            c.JSON(501, gin.H{
-                "message": "Update loan endpoint - coming soon",
-                "status":  "not_implemented",
-            })
-        })
+        loans.GET("/client/:clientId", h.GetLoansByClientID)
+        loans.GET("/stats", h.GetLoanStats)
     }
 }
 
-// setupReportRoutes configures reporting endpoints (placeholder for future implementation)
-// Reports provide analytics and business intelligence for platform management
+// setupPaymentRoutes configures payment management endpoints
+func setupPaymentRoutes(rg *gin.RouterGroup, h *PaymentHandler) {
+    payments := rg.Group("/payments")
+    payments.Use(auth.AuthMiddleware())
+    
+    {
+        payments.GET("", h.GetAllPayments)
+        payments.POST("", h.CreatePayment)
+        payments.GET("/:id", h.GetPaymentByID)
+        payments.PUT("/:id", h.UpdatePayment)
+        payments.DELETE("/:id", h.DeletePayment)
+        
+        payments.GET("/loan/:loanId", h.GetPaymentsByLoanID)
+    }
+}
+
+// setupReportRoutes configures reporting endpoints
 func setupReportRoutes(rg *gin.RouterGroup) {
     reports := rg.Group("/reports")
-    reports.Use(auth.AuthMiddleware()) // All report routes will require authentication
-    reports.Use(AdminMiddleware()) // Typically reports require admin privileges
+    reports.Use(auth.AuthMiddleware())
+    reports.Use(AdminMiddleware())
     
     {
-        // Placeholder routes - to be implemented in future iterations
         reports.GET("/clients", func(c *gin.Context) {
             c.JSON(501, gin.H{
                 "message": "Client reports endpoint - coming soon",
@@ -156,20 +142,17 @@ func setupReportRoutes(rg *gin.RouterGroup) {
     }
 }
 
-// setupSystemRoutes configures system-level endpoints for infrastructure and monitoring
-// These endpoints are essential for deployment, monitoring, and API discovery
+// setupSystemRoutes configures system-level endpoints
 func setupSystemRoutes(router *gin.Engine) {
-    // Health check endpoint - used by load balancers, container orchestration, and monitoring systems
     router.GET("/health", func(c *gin.Context) {
         c.JSON(200, gin.H{
             "status":    "healthy",
             "service":   "micro-lending-platform",
             "version":   "1.0.0",
-            "timestamp": gin.H{"iso": "", "unix": 0}, // Would be populated in actual implementation
+            "timestamp": gin.H{"iso": "", "unix": 0},
         })
     })
     
-    // API info endpoint - provides basic API information and discovery
     router.GET("/", func(c *gin.Context) {
         c.JSON(200, gin.H{
             "name":        "Micro Lending Platform API",
@@ -178,15 +161,14 @@ func setupSystemRoutes(router *gin.Engine) {
             "endpoints": gin.H{
                 "api_v1":        "/api/v1",
                 "health":        "/health",
-                "documentation": "TBD", // Would point to Swagger/OpenAPI docs if available
+                "documentation": "TBD",
             },
             "contact": gin.H{
-                "support": "TBD", // Would contain support contact information
+                "support": "TBD",
             },
         })
     })
     
-    // 404 handler for undefined routes - provides helpful error messages
     router.NoRoute(func(c *gin.Context) {
         c.JSON(404, gin.H{
             "error":   "Endpoint not found",
@@ -201,12 +183,9 @@ func setupSystemRoutes(router *gin.Engine) {
     })
 }
 
-// AdminMiddleware is a placeholder for admin-only route protection
-// This would be implemented to restrict certain endpoints to admin users only
+// AdminMiddleware for admin-only route protection
 func AdminMiddleware() gin.HandlerFunc {
     return func(c *gin.Context) {
-        // For now, this is a pass-through middleware
-        // Future implementation would check user roles from JWT claims
         c.Next()
     }
 }

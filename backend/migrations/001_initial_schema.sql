@@ -57,6 +57,7 @@ CREATE TABLE IF NOT EXISTS loans (
     deductions VARCHAR(100),
     amount_release DECIMAL(10,2) NOT NULL,
     payment_period_weeks INTEGER,
+    paid_weeks INTEGER DEFAULT 0,
     method_of_payment VARCHAR(50),
     credit_history VARCHAR(50),
     recommended_by VARCHAR(100),
@@ -159,15 +160,4 @@ CREATE INDEX IF NOT EXISTS idx_family_members_client_id ON family_members(client
 
 
 
--- Add missing columns to family_members table
-ALTER TABLE family_members ADD COLUMN birthday DATETIME;
-ALTER TABLE family_members ADD COLUMN nickname VARCHAR(50);
 
--- Ensure name_ci column exists in loans table
-ALTER TABLE loans ADD COLUMN name_ci VARCHAR(100);
-
-
--- Insert initial admin user (password: "admin123")
--- Note: Replace with actual bcrypt hash in production
-INSERT OR IGNORE INTO users (username, password_hash, is_admin) 
-VALUES ('admin', '$2a$10$r8R2Qk9U9W9p9V9X9Y9Z9A9B9C9D9E9F9G9H9I9J9K9L9M9N9O9P9Q', 1);

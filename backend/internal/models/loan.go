@@ -1,3 +1,4 @@
+// backend/internal/models/loan.go
 package models
 
 import (
@@ -28,6 +29,7 @@ type Loan struct {
     Deductions            string    `gorm:"size:100" json:"deductions"`
     AmountRelease         float64   `gorm:"type:decimal(10,2);not null" json:"amount_release"`
     PaymentPeriodWeeks    int       `json:"payment_period_weeks"`
+    PaidWeeks             int       `gorm:"default:0" json:"paid_weeks"` // ADD THIS FIELD
     MethodOfPayment       string    `gorm:"size:50" json:"method_of_payment"`
     CreditHistory         string    `gorm:"size:50" json:"credit_history"`
     RecommendedBy         string    `gorm:"size:100" json:"recommended_by"`
@@ -36,7 +38,7 @@ type Loan struct {
     RecommendedLoanAmount float64   `gorm:"type:decimal(10,2)" json:"recommended_loan_amount"`
     ApprovedLoanAmount    float64   `gorm:"type:decimal(10,2)" json:"approved_loan_amount"`
     CheckedBy             string    `gorm:"size:100" json:"checked_by"`
-    NameCI                string    `gorm:"size:100" json:"name_ci"` // ADD THIS MISSING FIELD
+    NameCI                string    `gorm:"size:100" json:"name_ci"`
     NotedBy               string    `gorm:"size:100" json:"noted_by"`
     ApplicationDate       time.Time `json:"application_date"`
     

@@ -59,7 +59,7 @@ const navigateToPayments = () => {
 }
 
 const navigateToReports = () => {
-  alert('Reports feature coming soon!')
+  router.push('/reports')
 }
 </script>
 

@@ -1048,6 +1048,7 @@ const loan = reactive({
   ammortization: 0,
   outstanding_balance: 0,
   mode: 'Weekly',
+  payment_period_weeks: 0, 
   deductions: '',
   due_date: '',
   amount_release: 0,
@@ -1133,7 +1134,8 @@ const applyLoanCalculation = () => {
   loan.deductions = result.deductionType;
   loan.amount_release = result.amountRelease;
   loan.mode = 'Weekly';
-  
+  loan.payment_period_weeks = result.numberOfWeeks; // ADD THIS LINE 
+
   loanCalculationApplied.value = true;
 };
 
