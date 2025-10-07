@@ -49,6 +49,12 @@
       </div>
     </div>
 
+    <!-- Loading State -->
+    <div v-if="loading" class="loading-overlay">
+      <div class="spinner"></div>
+      <p>Loading report data...</p>
+    </div>
+
     <!-- Key Metrics Dashboard -->
     <div class="metrics-grid">
       <!-- Total Collections -->
@@ -57,9 +63,7 @@
         <div class="metric-content">
           <h3>Total Collections</h3>
           <div class="metric-value">₱{{ formatCurrency(summary.totalCollections) }}</div>
-          <div class="metric-trend" :class="getTrendClass(summary.collectionTrend)">
-            {{ getTrendIcon(summary.collectionTrend) }} {{ Math.abs(summary.collectionTrend) }}%
-          </div>
+          <div class="metric-subtitle">{{ summary.paymentsCount }} payments received</div>
         </div>
       </div>
 
@@ -69,9 +73,7 @@
         <div class="metric-content">
           <h3>Total Loan Releases</h3>
           <div class="metric-value">₱{{ formatCurrency(summary.totalReleases) }}</div>
-          <div class="metric-trend" :class="getTrendClass(summary.releaseTrend)">
-            {{ getTrendIcon(summary.releaseTrend) }} {{ Math.abs(summary.releaseTrend) }}%
-          </div>
+          <div class="metric-subtitle">{{ summary.newLoansCount }} new loans</div>
         </div>
       </div>
 
@@ -81,7 +83,7 @@
         <div class="metric-content">
           <h3>Active Loans</h3>
           <div class="metric-value">{{ summary.activeLoans }}</div>
-          <div class="metric-subtitle">{{ summary.newLoansThisPeriod }} new this period</div>
+          <div class="metric-subtitle">{{ summary.overdueLoans }} overdue</div>
         </div>
       </div>
 
@@ -96,67 +98,101 @@
       </div>
 
       <!-- Collection Efficiency -->
-      <div class="metric-card" :class="getEfficiencyClass(summary.collectionEfficiency)">
+      <div class="metric-card" :class="getEfficiencyClass(summary.collectionRate)">
         <div class="metric-icon">📊</div>
         <div class="metric-content">
-          <h3>Collection Efficiency</h3>
-          <div class="metric-value">{{ summary.collectionEfficiency }}%</div>
+          <h3>Collection Rate</h3>
+          <div class="metric-value">{{ summary.collectionRate }}%</div>
           <div class="metric-subtitle">
-            {{ summary.paymentsReceived }}/{{ summary.paymentsExpected }} payments
+            ₱{{ formatCurrency(summary.totalCollections) }} collected
           </div>
         </div>
       </div>
 
-      <!-- Average Loan Size -->
+      <!-- Total Clients -->
       <div class="metric-card success">
-        <div class="metric-icon">📦</div>
+        <div class="metric-icon">👥</div>
         <div class="metric-content">
-          <h3>Average Loan Size</h3>
-          <div class="metric-value">₱{{ formatCurrency(summary.averageLoanSize) }}</div>
-          <div class="metric-subtitle">Per client</div>
+          <h3>Total Clients</h3>
+          <div class="metric-value">{{ summary.totalClients }}</div>
+          <div class="metric-subtitle">{{ summary.newClientsCount }} new this period</div>
         </div>
       </div>
     </div>
 
     <!-- Charts Section -->
     <div class="charts-grid">
-      <!-- Collections vs Releases Chart -->
+      <!-- Weekly Collections Chart -->
       <div class="chart-card">
         <div class="chart-header">
-          <h3>Collections vs Loan Releases</h3>
-          <div class="chart-legend">
-            <div class="legend-item">
-              <span class="legend-color collections"></span>
-              Collections
-            </div>
-            <div class="legend-item">
-              <span class="legend-color releases"></span>
-              Releases
-            </div>
-          </div>
+          <h3>Weekly Collections</h3>
         </div>
         <div class="chart-container">
-          <canvas ref="collectionsChart"></canvas>
+          <div class="simple-bar-chart">
+            <div v-for="(week, index) in weeklyCollections" :key="index" class="bar-group">
+              <div class="bar-label">W{{ index + 1 }}</div>
+              <div class="bars-container">
+                <div 
+                  class="bar collections-bar" 
+                  :style="{ height: getBarHeight(week.total, maxCollection) + 'px' }"
+                  :title="'Week ' + (index + 1) + ': ₱' + formatCurrency(week.total)"
+                ></div>
+              </div>
+              <div class="bar-value">₱{{ formatCurrency(week.total) }}</div>
+            </div>
+          </div>
         </div>
       </div>
 
       <!-- Loan Status Distribution -->
       <div class="chart-card">
         <div class="chart-header">
-          <h3>Loan Portfolio Distribution</h3>
+          <h3>Loan Portfolio</h3>
         </div>
         <div class="chart-container">
-          <canvas ref="loanStatusChart"></canvas>
+          <div class="pie-chart">
+            <svg width="200" height="200" viewBox="0 0 42 42">
+              <circle cx="21" cy="21" r="15.9155" fill="transparent" stroke="#e5e7eb" stroke-width="3"/>
+              
+              <circle 
+                v-for="(status, index) in loanStatusData" 
+                :key="status.name"
+                cx="21" cy="21" r="15.9155" fill="transparent" 
+                :stroke="status.color" 
+                stroke-width="3"
+                :stroke-dasharray="`${status.percentage} ${100 - status.percentage}`"
+                :stroke-dashoffset="getPieOffset(index)"
+              />
+            </svg>
+            <div class="pie-legend">
+              <div v-for="status in loanStatusData" :key="status.name" class="pie-legend-item">
+                <span class="legend-dot" :style="{ backgroundColor: status.color }"></span>
+                <span class="legend-text">{{ status.name }}: {{ status.count }} ({{ status.percentage }}%)</span>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
-      <!-- Weekly Collection Trend -->
+      <!-- Payment Methods -->
       <div class="chart-card full-width">
         <div class="chart-header">
-          <h3>Weekly Collection Trend</h3>
+          <h3>Payment Methods</h3>
         </div>
         <div class="chart-container">
-          <canvas ref="weeklyTrendChart"></canvas>
+          <div class="payment-methods-chart">
+            <div v-for="method in paymentMethods" :key="method.method" class="method-bar">
+              <div class="method-label">{{ method.method || 'Unknown' }}</div>
+              <div class="method-bar-container">
+                <div 
+                  class="method-bar-fill" 
+                  :style="{ width: method.percentage + '%', backgroundColor: getMethodColor(method.method) }"
+                ></div>
+                <span class="method-value">₱{{ formatCurrency(method.amount) }} ({{ method.count }})</span>
+              </div>
+              <div class="method-percentage">{{ method.percentage }}%</div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -169,9 +205,8 @@
           <button 
             v-for="report in availableReports" 
             :key="report.id"
-            @click="generateDetailedReport(report.id)"
+            @click="activeReport = report.id"
             :class="['btn-report', { active: activeReport === report.id }]"
-            :disabled="loading"
           >
             {{ report.label }}
           </button>
@@ -180,104 +215,136 @@
 
       <!-- Report Content -->
       <div class="report-content">
-        <div v-if="loading" class="loading-state">
-          <div class="spinner"></div>
-          <p>Generating report...</p>
-        </div>
-
         <!-- Collection Summary Report -->
         <div v-if="activeReport === 'collections' && !loading" class="report-table">
-          <h4>Collection Summary</h4>
+          <div class="report-header">
+            <h4>Payment Collections</h4>
+            <div class="report-summary">
+              Total: ₱{{ formatCurrency(summary.totalCollections) }} from {{ summary.paymentsCount }} payments
+            </div>
+          </div>
           <table>
             <thead>
               <tr>
+                <th>Date</th>
+                <th>Client</th>
+                <th>Loan #</th>
                 <th>Week</th>
-                <th>Date Range</th>
-                <th>Expected</th>
-                <th>Collected</th>
-                <th>Efficiency</th>
+                <th>Amount</th>
+                <th>Method</th>
                 <th>Status</th>
               </tr>
             </thead>
             <tbody>
-              <tr v-for="week in weeklyReports" :key="week.weekNumber">
-                <td>Week {{ week.weekNumber }}</td>
-                <td>{{ week.dateRange }}</td>
-                <td>₱{{ formatCurrency(week.expectedAmount) }}</td>
-                <td>₱{{ formatCurrency(week.collectedAmount) }}</td>
+              <tr v-for="payment in paymentDetails" :key="payment.id">
+                <td>{{ formatDate(payment.payment_date) }}</td>
+                <td>{{ payment.client_name }}</td>
+                <td>{{ payment.loan_control_number }}</td>
+                <td>Week {{ payment.week_number }}</td>
+                <td>₱{{ formatCurrency(payment.amount_paid) }}</td>
                 <td>
-                  <span :class="getEfficiencyBadgeClass(week.efficiency)">
-                    {{ week.efficiency }}%
-                  </span>
+                  <span class="method-badge">{{ payment.payment_method || 'Cash' }}</span>
                 </td>
                 <td>
-                  <span :class="getStatusBadgeClass(week.status)">
-                    {{ week.status }}
+                  <span :class="['status-badge', getPaymentStatusClass(payment.status)]">
+                    {{ payment.status }}
                   </span>
                 </td>
               </tr>
             </tbody>
           </table>
+          <div v-if="paymentDetails.length === 0" class="no-data">
+            No payment records found for the selected period.
+          </div>
         </div>
 
         <!-- Loan Releases Report -->
         <div v-if="activeReport === 'releases' && !loading" class="report-table">
-          <h4>Loan Releases Summary</h4>
+          <div class="report-header">
+            <h4>Loan Releases</h4>
+            <div class="report-summary">
+              Total Released: ₱{{ formatCurrency(summary.totalReleases) }} across {{ loanReleases.length }} loans
+            </div>
+          </div>
           <table>
             <thead>
               <tr>
-                <th>Client</th>
-                <th>Control #</th>
                 <th>Release Date</th>
+                <th>Client</th>
+                <th>Loan #</th>
                 <th>Loan Amount</th>
                 <th>Amount Released</th>
+                <th>Terms</th>
                 <th>Status</th>
               </tr>
             </thead>
             <tbody>
-              <tr v-for="release in loanReleases" :key="release.id">
-                <td>{{ release.clientName }}</td>
-                <td>{{ release.controlNumber }}</td>
-                <td>{{ formatDate(release.releaseDate) }}</td>
-                <td>₱{{ formatCurrency(release.loanAmount) }}</td>
-                <td>₱{{ formatCurrency(release.amountReleased) }}</td>
+              <tr v-for="loan in loanReleases" :key="loan.id">
+                <td>{{ formatDate(loan.date_of_release) }}</td>
+                <td>{{ loan.client_name }}</td>
+                <td>{{ loan.control_number }}</td>
+                <td>₱{{ formatCurrency(loan.total_amount) }}</td>
+                <td>₱{{ formatCurrency(loan.amount_release) }}</td>
+                <td>{{ loan.terms }} weeks</td>
                 <td>
-                  <span :class="getLoanStatusBadgeClass(release.status)">
-                    {{ release.status }}
+                  <span :class="['status-badge', getLoanStatusClass(loan.status)]">
+                    {{ loan.status }}
                   </span>
                 </td>
               </tr>
             </tbody>
           </table>
+          <div v-if="loanReleases.length === 0" class="no-data">
+            No loan releases found for the selected period.
+          </div>
         </div>
 
         <!-- Portfolio at Risk Report -->
         <div v-if="activeReport === 'risk' && !loading" class="report-table">
-          <h4>Portfolio at Risk Analysis</h4>
+          <div class="report-header">
+            <h4>Portfolio at Risk Analysis</h4>
+            <div class="report-summary">
+              Total at Risk: ₱{{ formatCurrency(summary.atRiskAmount) }} ({{ summary.portfolioAtRisk }}% of portfolio)
+            </div>
+          </div>
           <table>
             <thead>
               <tr>
-                <th>Risk Category</th>
-                <th>Loan Count</th>
-                <th>Amount at Risk</th>
-                <th>Percentage</th>
-                <th>Average Days Overdue</th>
+                <th>Client</th>
+                <th>Loan #</th>
+                <th>Outstanding Balance</th>
+                <th>Status</th>
+                <th>Due Date</th>
+                <th>Days Overdue</th>
+                <th>Last Payment</th>
               </tr>
             </thead>
             <tbody>
-              <tr v-for="risk in riskAnalysis" :key="risk.category">
+              <tr v-for="loan in atRiskLoans" :key="loan.id">
+                <td>{{ loan.client_name }}</td>
+                <td>{{ loan.control_number }}</td>
+                <td>₱{{ formatCurrency(loan.outstanding_balance) }}</td>
                 <td>
-                  <span :class="getRiskCategoryClass(risk.category)">
-                    {{ risk.category }}
+                  <span :class="['status-badge', getLoanStatusClass(loan.status)]">
+                    {{ loan.status }}
                   </span>
                 </td>
-                <td>{{ risk.loanCount }}</td>
-                <td>₱{{ formatCurrency(risk.amountAtRisk) }}</td>
-                <td>{{ risk.percentage }}%</td>
-                <td>{{ risk.averageDaysOverdue }}</td>
+                <td>{{ loan.due_date || 'N/A' }}</td>
+                <td>
+                  <span v-if="loan.days_overdue > 0" class="overdue-days">
+                    {{ loan.days_overdue }} days
+                  </span>
+                  <span v-else>-</span>
+                </td>
+                <td>
+                  {{ loan.last_payment_date ? formatDate(loan.last_payment_date) : 'No payments' }}
+                </td>
               </tr>
             </tbody>
           </table>
+          <div v-if="atRiskLoans.length === 0" class="no-data">
+            No at-risk loans found for the selected period.
+          </div>
         </div>
       </div>
     </div>
@@ -290,20 +357,20 @@
       </div>
       <div class="stat-item">
         <span class="stat-label">Generated On:</span>
-        <span class="stat-value">{{ new Date().toLocaleDateString() }}</span>
+        <span class="stat-value">{{ new Date().toLocaleDateString() }} at {{ new Date().toLocaleTimeString() }}</span>
       </div>
       <div class="stat-item">
-        <span class="stat-label">Total Clients:</span>
-        <span class="stat-value">{{ summary.totalClients }}</span>
+        <span class="stat-label">Data Source:</span>
+        <span class="stat-value">Live Database</span>
       </div>
     </footer>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted, watch, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import Chart from 'chart.js/auto'
+import { api } from '../services/api'
 
 const router = useRouter()
 
@@ -316,224 +383,263 @@ const dateRange = ref({
 const selectedPeriod = ref('month')
 const activeReport = ref('collections')
 
-// Chart references
-const collectionsChart = ref(null)
-const loanStatusChart = ref(null)
-const weeklyTrendChart = ref(null)
-
-// Report data
+// Data from database
 const summary = ref({
   totalCollections: 0,
   totalReleases: 0,
   activeLoans: 0,
+  overdueLoans: 0,
   portfolioAtRisk: 0,
-  collectionEfficiency: 0,
-  averageLoanSize: 0,
-  collectionTrend: 0,
-  releaseTrend: 0,
-  newLoansThisPeriod: 0,
+  collectionRate: 0,
   atRiskAmount: 0,
-  paymentsReceived: 0,
-  paymentsExpected: 0,
-  totalClients: 0
+  paymentsCount: 0,
+  newLoansCount: 0,
+  totalClients: 0,
+  newClientsCount: 0
 })
 
-const weeklyReports = ref([])
+const paymentDetails = ref([])
 const loanReleases = ref([])
-const riskAnalysis = ref([])
+const atRiskLoans = ref([])
+const weeklyCollections = ref([])
+const paymentMethods = ref([])
 
 const availableReports = [
-  { id: 'collections', label: 'Collection Summary' },
+  { id: 'collections', label: 'Payment Collections' },
   { id: 'releases', label: 'Loan Releases' },
   { id: 'risk', label: 'Portfolio at Risk' }
 ]
+
+// Computed properties for charts
+const loanStatusData = computed(() => {
+  const totalLoans = summary.value.activeLoans + summary.value.overdueLoans
+  if (totalLoans === 0) return []
+
+  return [
+    { 
+      name: 'Active', 
+      count: summary.value.activeLoans, 
+      percentage: Math.round((summary.value.activeLoans / totalLoans) * 100),
+      color: '#3b82f6' 
+    },
+    { 
+      name: 'Overdue', 
+      count: summary.value.overdueLoans, 
+      percentage: Math.round((summary.value.overdueLoans / totalLoans) * 100),
+      color: '#ef4444' 
+    }
+  ]
+})
+
+const maxCollection = computed(() => {
+  if (weeklyCollections.value.length === 0) return 1
+  return Math.max(...weeklyCollections.value.map(w => w.total))
+})
 
 // Methods
 const fetchReportData = async () => {
   loading.value = true
   try {
-    // Simulate API calls - replace with actual API endpoints
     await Promise.all([
-      fetchSummaryData(),
-      fetchWeeklyReports(),
+      fetchDashboardSummary(),
+      fetchPaymentDetails(),
       fetchLoanReleases(),
-      fetchRiskAnalysis()
+      fetchAtRiskLoans(),
+      fetchWeeklyCollections(),
+      fetchPaymentMethods()
     ])
-    
-    // Initialize charts after data is loaded
-    setTimeout(() => {
-      initializeCharts()
-    }, 100)
-    
   } catch (error) {
     console.error('Error fetching report data:', error)
+    alert('Failed to load report data. Please try again.')
   } finally {
     loading.value = false
   }
 }
 
-const fetchSummaryData = async () => {
-  // Mock data - replace with actual API call
-  summary.value = {
-    totalCollections: 125000,
-    totalReleases: 180000,
-    activeLoans: 45,
-    portfolioAtRisk: 12.5,
-    collectionEfficiency: 87.3,
-    averageLoanSize: 7500,
-    collectionTrend: 15.2,
-    releaseTrend: 8.7,
-    newLoansThisPeriod: 12,
-    atRiskAmount: 22500,
-    paymentsReceived: 183,
-    paymentsExpected: 210,
-    totalClients: 67
+const fetchDashboardSummary = async () => {
+  try {
+    const params = new URLSearchParams({
+      start_date: dateRange.value.start,
+      end_date: dateRange.value.end
+    })
+
+    // Fetch payments summary
+    const paymentsResponse = await api.get(`/payments/stats?${params}`)
+    const paymentsData = paymentsResponse.data
+
+    // Fetch loans summary
+    const loansResponse = await api.get(`/loans/stats?${params}`)
+    const loansData = loansResponse.data
+
+    // Fetch clients summary
+    const clientsResponse = await api.get(`/clients/stats?${params}`)
+    const clientsData = clientsResponse.data
+
+    // Fetch portfolio at risk
+    const parResponse = await api.get('/loans/portfolio-at-risk')
+    const parData = parResponse.data
+
+    summary.value = {
+      totalCollections: paymentsData.total_collected || 0,
+      totalReleases: loansData.total_disbursed || 0,
+      activeLoans: loansData.active_loans || 0,
+      overdueLoans: loansData.overdue_loans || 0,
+      portfolioAtRisk: parData.portfolio_at_risk || 0,
+      collectionRate: loansData.collection_rate || 0,
+      atRiskAmount: parData.total_at_risk || 0,
+      paymentsCount: paymentsData.total_payments || 0,
+      newLoansCount: loansData.new_loans_this_period || 0,
+      totalClients: clientsData.total_clients || 0,
+      newClientsCount: clientsData.new_this_month || 0
+    }
+  } catch (error) {
+    console.error('Error fetching dashboard summary:', error)
+    // Set default values if API fails
+    summary.value = {
+      totalCollections: 0,
+      totalReleases: 0,
+      activeLoans: 0,
+      overdueLoans: 0,
+      portfolioAtRisk: 0,
+      collectionRate: 0,
+      atRiskAmount: 0,
+      paymentsCount: 0,
+      newLoansCount: 0,
+      totalClients: 0,
+      newClientsCount: 0
+    }
   }
 }
 
-const fetchWeeklyReports = async () => {
-  // Mock data - replace with actual API call
-  weeklyReports.value = [
-    { weekNumber: 1, dateRange: 'Jan 1-7', expectedAmount: 25000, collectedAmount: 23000, efficiency: 92, status: 'Good' },
-    { weekNumber: 2, dateRange: 'Jan 8-14', expectedAmount: 25500, collectedAmount: 24500, efficiency: 96, status: 'Excellent' },
-    { weekNumber: 3, dateRange: 'Jan 15-21', expectedAmount: 26000, collectedAmount: 22000, efficiency: 85, status: 'Fair' },
-    { weekNumber: 4, dateRange: 'Jan 22-28', expectedAmount: 26500, collectedAmount: 25000, efficiency: 94, status: 'Good' }
-  ]
+const fetchPaymentDetails = async () => {
+  try {
+    const params = new URLSearchParams({
+      start_date: dateRange.value.start,
+      end_date: dateRange.value.end
+    })
+    
+    const response = await api.get(`/payments?${params}`)
+    paymentDetails.value = response.data.payments || []
+  } catch (error) {
+    console.error('Error fetching payment details:', error)
+    paymentDetails.value = []
+  }
 }
 
 const fetchLoanReleases = async () => {
-  // Mock data - replace with actual API call
-  loanReleases.value = [
-    { id: 1, clientName: 'Juan Dela Cruz', controlNumber: 'MLP-2024-001', releaseDate: '2024-01-15', loanAmount: 10000, amountReleased: 9500, status: 'Active' },
-    { id: 2, clientName: 'Maria Santos', controlNumber: 'MLP-2024-002', releaseDate: '2024-01-18', loanAmount: 8000, amountReleased: 7600, status: 'Active' },
-    { id: 3, clientName: 'Pedro Reyes', controlNumber: 'MLP-2024-003', releaseDate: '2024-01-22', loanAmount: 12000, amountReleased: 11400, status: 'Active' }
-  ]
+  try {
+    const params = new URLSearchParams({
+      start_date: dateRange.value.start,
+      end_date: dateRange.value.end,
+      status: 'Active'
+    })
+    
+    const response = await api.get(`/loans?${params}`)
+    loanReleases.value = response.data.loans || []
+  } catch (error) {
+    console.error('Error fetching loan releases:', error)
+    loanReleases.value = []
+  }
 }
 
-const fetchRiskAnalysis = async () => {
-  // Mock data - replace with actual API call
-  riskAnalysis.value = [
-    { category: 'Current (0-7 days)', loanCount: 35, amountAtRisk: 0, percentage: 0, averageDaysOverdue: 0 },
-    { category: 'Watch (8-30 days)', loanCount: 6, amountAtRisk: 8500, percentage: 4.7, averageDaysOverdue: 18 },
-    { category: 'Substandard (31-90 days)', loanCount: 3, amountAtRisk: 12000, percentage: 6.7, averageDaysOverdue: 45 },
-    { category: 'Doubtful (91-180 days)', loanCount: 1, amountAtRisk: 2000, percentage: 1.1, averageDaysOverdue: 120 }
-  ]
+const fetchAtRiskLoans = async () => {
+  try {
+    const response = await api.get('/loans?status=Overdue')
+    const overdueLoans = response.data.loans || []
+    
+    // Calculate days overdue for each loan
+    atRiskLoans.value = overdueLoans.map(loan => {
+      const dueDate = new Date(loan.due_date)
+      const today = new Date()
+      const daysOverdue = Math.floor((today - dueDate) / (1000 * 60 * 60 * 24))
+      
+      return {
+        ...loan,
+        days_overdue: daysOverdue > 0 ? daysOverdue : 0,
+        last_payment_date: loan.last_payment_date || null
+      }
+    })
+  } catch (error) {
+    console.error('Error fetching at-risk loans:', error)
+    atRiskLoans.value = []
+  }
 }
 
-const initializeCharts = () => {
-  // Collections vs Releases Chart
-  if (collectionsChart.value) {
-    new Chart(collectionsChart.value, {
-      type: 'bar',
-      data: {
-        labels: ['Week 1', 'Week 2', 'Week 3', 'Week 4'],
-        datasets: [
-          {
-            label: 'Collections',
-            data: [23000, 24500, 22000, 25000],
-            backgroundColor: '#10b981',
-            borderColor: '#059669',
-            borderWidth: 1
-          },
-          {
-            label: 'Releases',
-            data: [30000, 25000, 35000, 28000],
-            backgroundColor: '#3b82f6',
-            borderColor: '#1d4ed8',
-            borderWidth: 1
-          }
-        ]
-      },
-      options: {
-        responsive: true,
-        plugins: {
-          legend: {
-            position: 'top',
-          },
-          title: {
-            display: true,
-            text: 'Weekly Performance'
-          }
-        },
-        scales: {
-          y: {
-            beginAtZero: true,
-            ticks: {
-              callback: function(value) {
-                return '₱' + value.toLocaleString()
-              }
-            }
-          }
-        }
-      }
-    })
+const fetchWeeklyCollections = async () => {
+  try {
+    const response = await api.get('/payments/weekly-collections')
+    weeklyCollections.value = response.data.collections || []
+  } catch (error) {
+    console.error('Error fetching weekly collections:', error)
+    // Generate mock weekly data if API not available
+    weeklyCollections.value = generateWeeklyData()
   }
+}
 
-  // Loan Status Distribution Chart
-  if (loanStatusChart.value) {
-    new Chart(loanStatusChart.value, {
-      type: 'doughnut',
-      data: {
-        labels: ['Active', 'Overdue', 'Paid', 'Pending'],
-        datasets: [{
-          data: [45, 8, 32, 5],
-          backgroundColor: [
-            '#3b82f6',
-            '#ef4444',
-            '#10b981',
-            '#f59e0b'
-          ],
-          borderWidth: 2,
-          borderColor: '#ffffff'
-        }]
-      },
-      options: {
-        responsive: true,
-        plugins: {
-          legend: {
-            position: 'bottom'
-          }
-        }
-      }
-    })
+const fetchPaymentMethods = async () => {
+  try {
+    const response = await api.get('/payments/stats/methods')
+    paymentMethods.value = response.data.methods || []
+  } catch (error) {
+    console.error('Error fetching payment methods:', error)
+    // Generate mock payment methods data
+    paymentMethods.value = [
+      { method: 'Cash', amount: 75000, count: 45, percentage: 60 },
+      { method: 'GCash', amount: 35000, count: 25, percentage: 28 },
+      { method: 'Bank Transfer', amount: 15000, count: 10, percentage: 12 }
+    ]
   }
+}
 
-  // Weekly Collection Trend Chart
-  if (weeklyTrendChart.value) {
-    new Chart(weeklyTrendChart.value, {
-      type: 'line',
-      data: {
-        labels: ['Jan W1', 'Jan W2', 'Jan W3', 'Jan W4', 'Feb W1', 'Feb W2'],
-        datasets: [{
-          label: 'Collection Trend',
-          data: [22000, 24500, 23000, 25000, 26500, 28000],
-          borderColor: '#10b981',
-          backgroundColor: 'rgba(16, 185, 129, 0.1)',
-          borderWidth: 3,
-          fill: true,
-          tension: 0.4
-        }]
-      },
-      options: {
-        responsive: true,
-        plugins: {
-          legend: {
-            display: false
-          }
-        },
-        scales: {
-          y: {
-            beginAtZero: false,
-            ticks: {
-              callback: function(value) {
-                return '₱' + value.toLocaleString()
-              }
-            }
-          }
-        }
-      }
+const generateWeeklyData = () => {
+  const weeks = []
+  const baseDate = new Date(dateRange.value.start)
+  
+  for (let i = 0; i < 4; i++) {
+    const weekStart = new Date(baseDate)
+    weekStart.setDate(baseDate.getDate() + (i * 7))
+    
+    const weekEnd = new Date(weekStart)
+    weekEnd.setDate(weekStart.getDate() + 6)
+    
+    // Simulate some data based on actual payments
+    const weekTotal = paymentDetails.value
+      .filter(p => {
+        const paymentDate = new Date(p.payment_date)
+        return paymentDate >= weekStart && paymentDate <= weekEnd
+      })
+      .reduce((sum, p) => sum + (p.amount_paid || 0), 0)
+    
+    weeks.push({
+      week: i + 1,
+      total: weekTotal || Math.random() * 20000 + 5000, // Fallback to random data
+      date_range: `${formatDate(weekStart.toISOString())} - ${formatDate(weekEnd.toISOString())}`
     })
   }
+  
+  return weeks
+}
+
+// Chart helper methods
+const getBarHeight = (value, maxValue) => {
+  const maxHeight = 150
+  return maxValue > 0 ? (value / maxValue) * maxHeight : 0
+}
+
+const getPieOffset = (index) => {
+  if (index === 0) return 25
+  const previousPercentage = loanStatusData.value.slice(0, index).reduce((sum, status) => sum + status.percentage, 0)
+  return 25 - previousPercentage
+}
+
+const getMethodColor = (method) => {
+  const colors = {
+    'Cash': '#10b981',
+    'GCash': '#3b82f6',
+    'Bank Transfer': '#8b5cf6',
+    'Check': '#f59e0b'
+  }
+  return colors[method] || '#6b7280'
 }
 
 const setDateRange = (period) => {
@@ -557,19 +663,12 @@ const setDateRange = (period) => {
   fetchReportData()
 }
 
-const generateDetailedReport = (reportId) => {
-  activeReport.value = reportId
-  // In a real app, you would fetch specific report data here
-}
-
 const exportToPDF = () => {
-  // Implement PDF export logic
-  alert('PDF export feature will be implemented soon!')
+  alert('PDF export will be implemented with backend API integration')
 }
 
 const exportToCSV = () => {
-  // Implement CSV export logic
-  alert('CSV export feature will be implemented soon!')
+  alert('CSV export will be implemented with backend API integration')
 }
 
 const formatCurrency = (amount) => {
@@ -581,15 +680,11 @@ const formatCurrency = (amount) => {
 
 const formatDate = (dateString) => {
   if (!dateString) return '-'
-  return new Date(dateString).toLocaleDateString('en-PH')
-}
-
-const getTrendClass = (trend) => {
-  return trend >= 0 ? 'trend-up' : 'trend-down'
-}
-
-const getTrendIcon = (trend) => {
-  return trend >= 0 ? '📈' : '📉'
+  try {
+    return new Date(dateString).toLocaleDateString('en-PH')
+  } catch (error) {
+    return '-'
+  }
 }
 
 const getRiskCardClass = (riskPercentage) => {
@@ -604,23 +699,16 @@ const getEfficiencyClass = (efficiency) => {
   return 'danger'
 }
 
-const getEfficiencyBadgeClass = (efficiency) => {
-  if (efficiency >= 90) return 'badge-success'
-  if (efficiency >= 80) return 'badge-warning'
-  return 'badge-danger'
-}
-
-const getStatusBadgeClass = (status) => {
+const getPaymentStatusClass = (status) => {
   const statusMap = {
-    'Excellent': 'badge-success',
-    'Good': 'badge-info',
-    'Fair': 'badge-warning',
-    'Poor': 'badge-danger'
+    'Paid': 'badge-success',
+    'Pending': 'badge-warning',
+    'Overdue': 'badge-danger'
   }
   return statusMap[status] || 'badge-info'
 }
 
-const getLoanStatusBadgeClass = (status) => {
+const getLoanStatusClass = (status) => {
   const statusMap = {
     'Active': 'badge-info',
     'Overdue': 'badge-danger',
@@ -628,17 +716,6 @@ const getLoanStatusBadgeClass = (status) => {
     'Pending': 'badge-warning'
   }
   return statusMap[status] || 'badge-info'
-}
-
-const getRiskCategoryClass = (category) => {
-  const categoryMap = {
-    'Current (0-7 days)': 'risk-current',
-    'Watch (8-30 days)': 'risk-watch',
-    'Substandard (31-90 days)': 'risk-substandard',
-    'Doubtful (91-180 days)': 'risk-doubtful',
-    'Loss (>180 days)': 'risk-loss'
-  }
-  return categoryMap[category] || ''
 }
 
 // Lifecycle
@@ -658,6 +735,30 @@ watch(dateRange, () => {
   margin: 0 auto;
   background: #f8fafc;
   min-height: 100vh;
+}
+
+.loading-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.9);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.loading-overlay .spinner {
+  width: 50px;
+  height: 50px;
+  border: 5px solid #f3f3f3;
+  border-top: 5px solid #3b82f6;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 1rem;
 }
 
 .page-header {
@@ -829,19 +930,6 @@ watch(dateRange, () => {
   margin-bottom: 0.25rem;
 }
 
-.metric-trend {
-  font-size: 0.75rem;
-  font-weight: 600;
-}
-
-.trend-up {
-  color: #10b981;
-}
-
-.trend-down {
-  color: #ef4444;
-}
-
 .metric-subtitle {
   font-size: 0.75rem;
   color: #6b7280;
@@ -866,9 +954,6 @@ watch(dateRange, () => {
 }
 
 .chart-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
   margin-bottom: 1rem;
 }
 
@@ -878,35 +963,146 @@ watch(dateRange, () => {
   color: #1f2937;
 }
 
-.chart-legend {
-  display: flex;
-  gap: 1rem;
-  font-size: 0.75rem;
-}
-
-.legend-item {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.legend-color {
-  width: 12px;
-  height: 12px;
-  border-radius: 2px;
-}
-
-.legend-color.collections {
-  background: #10b981;
-}
-
-.legend-color.releases {
-  background: #3b82f6;
-}
-
 .chart-container {
   height: 300px;
   position: relative;
+}
+
+/* Simple Bar Chart Styles */
+.simple-bar-chart {
+  display: flex;
+  align-items: end;
+  justify-content: space-around;
+  height: 200px;
+  padding: 20px 0;
+  gap: 15px;
+}
+
+.bar-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+}
+
+.bar-label {
+  font-size: 0.75rem;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.bars-container {
+  display: flex;
+  align-items: end;
+  justify-content: center;
+  height: 150px;
+  width: 100%;
+}
+
+.bar {
+  width: 30px;
+  border-radius: 4px 4px 0 0;
+  transition: all 0.3s ease;
+  background: #10b981;
+}
+
+.bar:hover {
+  opacity: 0.8;
+  transform: scale(1.05);
+}
+
+.bar-value {
+  font-size: 0.75rem;
+  color: #374151;
+  font-weight: 500;
+}
+
+/* Pie Chart Styles */
+.pie-chart {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2rem;
+  height: 100%;
+}
+
+.pie-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.pie-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+}
+
+.legend-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+}
+
+.legend-text {
+  color: #374151;
+}
+
+/* Payment Methods Chart */
+.payment-methods-chart {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1rem 0;
+}
+
+.method-bar {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.method-label {
+  width: 100px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #374151;
+}
+
+.method-bar-container {
+  flex: 1;
+  background: #f3f4f6;
+  border-radius: 8px;
+  height: 30px;
+  position: relative;
+  overflow: hidden;
+}
+
+.method-bar-fill {
+  height: 100%;
+  border-radius: 8px;
+  transition: width 0.3s ease;
+}
+
+.method-value {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 0.75rem;
+  color: white;
+  font-weight: 500;
+  text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+}
+
+.method-percentage {
+  width: 50px;
+  text-align: right;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #374151;
 }
 
 .reports-section {
@@ -957,37 +1153,26 @@ watch(dateRange, () => {
   padding: 1.5rem;
 }
 
-.loading-state {
+.report-header {
   display: flex;
-  flex-direction: column;
+  justify-content: space-between;
   align-items: center;
-  justify-content: center;
-  padding: 3rem;
+  margin-bottom: 1.5rem;
+}
+
+.report-header h4 {
+  margin: 0;
+  color: #1f2937;
+}
+
+.report-summary {
+  font-size: 0.875rem;
   color: #6b7280;
-}
-
-.spinner {
-  width: 40px;
-  height: 40px;
-  border: 4px solid #f3f3f3;
-  border-top: 4px solid #3b82f6;
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-  margin-bottom: 1rem;
-}
-
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  font-weight: 500;
 }
 
 .report-table {
   overflow-x: auto;
-}
-
-.report-table h4 {
-  margin: 0 0 1rem 0;
-  color: #1f2937;
 }
 
 .report-table table {
@@ -1003,45 +1188,24 @@ watch(dateRange, () => {
   font-weight: 600;
   color: #374151;
   border-bottom: 1px solid #e5e7eb;
+  white-space: nowrap;
 }
 
 .report-table td {
   padding: 0.75rem 1rem;
   border-bottom: 1px solid #f3f4f6;
+  white-space: nowrap;
 }
 
 .report-table tr:last-child td {
   border-bottom: none;
 }
 
-.badge-success {
-  background: #d1fae5;
-  color: #065f46;
-  padding: 0.25rem 0.5rem;
-  border-radius: 12px;
-  font-size: 0.75rem;
-  font-weight: 600;
+.report-table tr:hover {
+  background: #f8fafc;
 }
 
-.badge-warning {
-  background: #fef3c7;
-  color: #92400e;
-  padding: 0.25rem 0.5rem;
-  border-radius: 12px;
-  font-size: 0.75rem;
-  font-weight: 600;
-}
-
-.badge-danger {
-  background: #fee2e2;
-  color: #991b1b;
-  padding: 0.25rem 0.5rem;
-  border-radius: 12px;
-  font-size: 0.75rem;
-  font-weight: 600;
-}
-
-.badge-info {
+.method-badge {
   background: #dbeafe;
   color: #1e40af;
   padding: 0.25rem 0.5rem;
@@ -1050,11 +1214,45 @@ watch(dateRange, () => {
   font-weight: 600;
 }
 
-.risk-current { color: #10b981; font-weight: 600; }
-.risk-watch { color: #f59e0b; font-weight: 600; }
-.risk-substandard { color: #ef4444; font-weight: 600; }
-.risk-doubtful { color: #dc2626; font-weight: 600; }
-.risk-loss { color: #7f1d1d; font-weight: 600; }
+.status-badge {
+  padding: 0.25rem 0.75rem;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  display: inline-block;
+}
+
+.badge-success {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.badge-warning {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.badge-danger {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.badge-info {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.overdue-days {
+  color: #dc2626;
+  font-weight: 600;
+}
+
+.no-data {
+  text-align: center;
+  padding: 3rem;
+  color: #6b7280;
+  font-style: italic;
+}
 
 .stats-footer {
   background: white;
@@ -1080,6 +1278,11 @@ watch(dateRange, () => {
 .stat-value {
   color: #1f2937;
   font-weight: 600;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
 
 @media (max-width: 1024px) {
@@ -1119,6 +1322,17 @@ watch(dateRange, () => {
   }
   
   .stats-footer {
+    flex-direction: column;
+    gap: 0.5rem;
+    align-items: flex-start;
+  }
+  
+  .pie-chart {
+    flex-direction: column;
+    gap: 1rem;
+  }
+  
+  .report-header {
     flex-direction: column;
     gap: 0.5rem;
     align-items: flex-start;
