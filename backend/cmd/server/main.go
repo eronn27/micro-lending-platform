@@ -4,7 +4,7 @@ import (
     "log"
     "micro-lending-platform/backend/internal/config"
     "micro-lending-platform/backend/internal/database"
-    "micro-lending-platform/backend/internal/handlers"  // Now importing handlers package
+    "micro-lending-platform/backend/internal/handlers"
     "micro-lending-platform/backend/internal/repositories"
     "micro-lending-platform/backend/internal/services"
     "path/filepath"
@@ -75,17 +75,18 @@ func main() {
     clientRepo := repositories.NewClientRepository(db.DB)
     loanRepo := repositories.NewLoanRepository(db.DB)
     paymentRepo := repositories.NewPaymentRepository(db.DB)
+    reportRepo := repositories.NewReportRepository(db.DB)
 
     // Initialize services
     authService := services.NewAuthService(userRepo)
     clientService := services.NewClientService(clientRepo)
     loanService := services.NewLoanService(loanRepo)
     paymentService := services.NewPaymentService(paymentRepo, loanRepo)
-
+    reportService := services.NewReportService(reportRepo) 
 
 
     // Setup routes with all services
-    handlers.SetupRoutes(router, authService, clientService, loanService, paymentService)
+    handlers.SetupRoutes(router,  authService, clientService, loanService, paymentService, reportService)
 
     // Start the HTTP server on the configured port
     log.Printf("Server starting on port %s", cfg.ServerPort)
