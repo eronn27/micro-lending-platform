@@ -1023,4 +1023,8 @@ onMounted(() => {
   align-items: center;
   margin-right: auto; 
 }
+.back-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 16px rgba(156, 151, 151, 0.3);
+}
 </style>

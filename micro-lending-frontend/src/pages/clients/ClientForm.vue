@@ -1284,6 +1284,10 @@ watch([() => client.first_name, () => client.last_name], () => {
 .back-btn:hover:not(:disabled) {
   background-color: #5a6268;
 }
+.back-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 16px rgba(156, 151, 151, 0.3);
+}
 
 .form-layout {
   display: grid;
