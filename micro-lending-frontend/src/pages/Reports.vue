@@ -1,23 +1,28 @@
-# Reports.vue Component
-
-Create file: `micro-lending-frontend/src/pages/reports/Reports.vue`
-
-```vue
 <template>
   <div class="reports-container">
     <!-- Header -->
     <header class="reports-header">
-      <div class="header-content">
-        <h1>Reports & Analytics</h1>
-        <p class="subtitle">Weekly performance metrics and key statistics</p>
+      <!-- Left Section: Title -->
+      <div class="header-left">
+        <div class="header-content">
+          <h1>Reports & Analytics</h1>
+          <p class="subtitle">Weekly performance metrics and key statistics</p>
+        </div>
       </div>
-      <div class="header-actions">
-        <button @click="refreshData" :disabled="loading" class="btn-refresh">
-          <span v-if="!loading">🔄 Refresh</span>
-          <span v-else>Loading...</span>
-        </button>
+
+      <!-- Right Section: Actions -->
+      <div class="header-right">
         <div class="last-updated">
           Last updated: {{ lastUpdated }}
+        </div>
+        <div class="header-buttons">
+          <button @click="goBack" class="back-btn">
+            ← Back
+          </button>
+          <button @click="refreshData" :disabled="loading" class="btn-refresh">
+            <span v-if="!loading">🔄 Refresh</span>
+            <span v-else>Loading...</span>
+          </button>
         </div>
       </div>
     </header>
@@ -240,8 +245,10 @@ Create file: `micro-lending-frontend/src/pages/reports/Reports.vue`
 
 <script setup>
 import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { reportService } from '../services/reportService'
 
+const router = useRouter()
 const loading = ref(false)
 const error = ref(null)
 const lastUpdated = ref('-')
@@ -256,6 +263,11 @@ const reportData = ref({
   active_payment_total: 0,
   total_payment_this_week: 0
 })
+
+// Back button function
+const goBack = () => {
+  router.push('/dashboard')
+}
 
 const fetchReports = async () => {
   loading.value = true
@@ -380,6 +392,44 @@ onMounted(() => {
   padding: 2rem;
   border-radius: 12px;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.07);
+  gap: 2rem;
+}
+
+.header-left {
+  display: flex;
+  align-items: flex-start;
+  flex: 1;
+}
+
+.header-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1rem;
+}
+
+.header-buttons {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+}
+
+.back-btn {
+  padding: 0.75rem 1.25rem;
+  background: #6b7280;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  white-space: nowrap;
+}
+
+.back-btn:hover {
+  background: #4b5563;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
 }
 
 .header-content h1 {
@@ -394,12 +444,6 @@ onMounted(() => {
   font-size: 1rem;
 }
 
-.header-actions {
-  display: flex;
-  gap: 1.5rem;
-  align-items: center;
-}
-
 .btn-refresh {
   padding: 0.75rem 1.5rem;
   background: linear-gradient(135deg, #3b82f6, #1d4ed8);
@@ -409,6 +453,7 @@ onMounted(() => {
   font-weight: 600;
   cursor: pointer;
   transition: all 0.3s ease;
+  white-space: nowrap;
 }
 
 .btn-refresh:hover:not(:disabled) {
@@ -427,6 +472,7 @@ onMounted(() => {
   padding: 0.5rem 1rem;
   background: #f3f4f6;
   border-radius: 6px;
+  white-space: nowrap;
 }
 
 .loading-state {
@@ -797,11 +843,24 @@ onMounted(() => {
   .reports-header {
     flex-direction: column;
     padding: 1.5rem;
+    gap: 1.5rem;
   }
 
-  .header-actions {
+  .header-left {
     width: 100%;
+  }
+
+  .header-right {
+    width: 100%;
+    align-items: stretch;
+  }
+
+  .header-buttons {
     justify-content: space-between;
+  }
+
+  .last-updated {
+    text-align: center;
   }
 
   .metrics-grid {

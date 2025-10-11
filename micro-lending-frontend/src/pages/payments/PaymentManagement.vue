@@ -9,6 +9,7 @@
           Due Today
         </div>
       </div>
+      
       <div class="header-actions">
         <div class="bulk-actions" v-if="selectedClients.length > 0">
           <button 
@@ -21,6 +22,10 @@
           </button>
           <button @click="clearSelection" class="btn-clear">Clear Selection</button>
         </div>
+        
+        <button @click="goBack" class="back-btn">
+          ← Back to Dashboard
+        </button>
       </div>
     </header>
 
@@ -202,6 +207,10 @@ import { useRouter } from 'vue-router'
 import { api } from '../../services/api'
 
 const router = useRouter()
+const goBack = () => {
+  router.push('/dashboard')
+}
+
 
 // Reactive state
 const clients = ref([])
@@ -987,5 +996,31 @@ onMounted(() => {
     padding: 0.75rem 0.5rem;
     font-size: 0.8rem;
   }
+}
+.header-actions {
+  display: flex;
+  justify-content: flex-end; 
+  align-items: center;
+  gap: 1rem;
+  flex: 1;
+  margin-left: 2rem;
+}
+
+.back-btn {
+  padding: 0.75rem 1.5rem;
+  background-color: #6c757d;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9rem;
+ 
+}
+
+.bulk-actions {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  margin-right: auto; 
 }
 </style>
