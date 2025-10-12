@@ -1,0 +1,12 @@
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+data/
+
+# Node.js
+node_modules/
+.vite/
+
+# Temporary files
+Screenshot*
