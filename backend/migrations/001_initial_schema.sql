@@ -88,8 +88,8 @@ CREATE TABLE IF NOT EXISTS payments (
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     deleted_at DATETIME NULL,
-    FOREIGN KEY (loan_id) REFERENCES loans(id) ON DELETE CASCADE,
-    UNIQUE(loan_id, week_number)
+    FOREIGN KEY (loan_id) REFERENCES loans(id) ON DELETE CASCADE
+    
 );
 
 -- Co-makers table - Loan guarantors

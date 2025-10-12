@@ -163,3 +163,23 @@ func (h *PaymentHandler) GetAllPayments(c *gin.Context) {
         },
     })
 }
+
+// GetPaymentProgress retrieves payment progress for a loan
+func (h *PaymentHandler) GetPaymentProgress(c *gin.Context) {
+    idStr := c.Param("loanId")
+    loanId, err := strconv.ParseUint(idStr, 10, 32)
+    if err != nil {
+        c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid loan ID"})
+        return
+    }
+
+    progress, err := h.paymentService.GetPaymentProgress(uint(loanId))
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get payment progress"})
+        return
+    }
+
+    c.JSON(http.StatusOK, gin.H{
+        "progress": progress,
+    })
+}

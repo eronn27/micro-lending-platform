@@ -8,11 +8,15 @@ import (
 )
 
 type LoanService struct {
-    loanRepo *repositories.LoanRepository
+    loanRepo   *repositories.LoanRepository
+    clientRepo *repositories.ClientRepository  // Add clientRepo
 }
 
-func NewLoanService(loanRepo *repositories.LoanRepository) *LoanService {
-    return &LoanService{loanRepo: loanRepo}
+func NewLoanService(loanRepo *repositories.LoanRepository, clientRepo *repositories.ClientRepository) *LoanService {
+    return &LoanService{
+        loanRepo:   loanRepo,
+        clientRepo: clientRepo,
+    }
 }
 
 type LoanStats struct {
@@ -24,8 +28,8 @@ type LoanStats struct {
     TotalOutstanding float64 `json:"total_outstanding"`
 }
 
-// CreateLoan creates a new loan
-func (s *LoanService) CreateLoan(req *models.LoanCreate) (*models.Loan, error) {
+// CreateLoan creates a new loan - UPDATED to accept ClientID
+func (s *LoanService) CreateLoan(req *models.LoanCreate, clientID uint) (*models.Loan, error) {
     // Parse dates
     dateOfRelease, err := s.parseDate(req.DateOfRelease)
     if err != nil {
@@ -37,9 +41,9 @@ func (s *LoanService) CreateLoan(req *models.LoanCreate) (*models.Loan, error) {
         applicationDate = time.Now()
     }
 
-    // Create loan object
+    // Create loan object - NOW WITH CLIENT ID
     loan := &models.Loan{
-        ClientID:              0, // This should be set by the caller
+        ClientID:              clientID, // Use the provided client ID
         ControlNumber:         req.ControlNumber,
         DateOfRelease:         dateOfRelease,
         TotalAmount:           req.TotalAmount,
@@ -52,6 +56,7 @@ func (s *LoanService) CreateLoan(req *models.LoanCreate) (*models.Loan, error) {
         Deductions:            req.Deductions,
         AmountRelease:         req.AmountRelease,
         PaymentPeriodWeeks:    req.PaymentPeriodWeeks,
+        PaidWeeks:             0, // New loan starts at 0 paid weeks
         MethodOfPayment:       req.MethodOfPayment,
         CreditHistory:         req.CreditHistory,
         RecommendedBy:         req.RecommendedBy,
@@ -86,6 +91,16 @@ func (s *LoanService) CreateLoan(req *models.LoanCreate) (*models.Loan, error) {
     }
 
     return createdLoan, nil
+}
+
+// UpdateLoanFromHandler updates loan information from handler (for ClientID updates)
+func (s *LoanService) UpdateLoanFromHandler(loan *models.Loan) (*models.Loan, error) {
+    updatedLoan, err := s.loanRepo.Update(loan)
+    if err != nil {
+        return nil, fmt.Errorf("failed to update loan: %w", err)
+    }
+
+    return updatedLoan, nil
 }
 
 // GetAllLoans retrieves all loans with pagination and filtering
@@ -236,4 +251,54 @@ func (s *LoanService) parseDate(dateStr string) (time.Time, error) {
         return time.Time{}, fmt.Errorf("empty date string")
     }
     return time.Parse("2006-01-02", dateStr)
+}
+
+// GetClientsForPayments retrieves clients that need payment attention
+func (s *LoanService) GetClientsForPayments() ([]models.Client, error) {
+    loans, err := s.loanRepo.GetLoansForPayments()
+    if err != nil {
+        return nil, err
+    }
+
+    // Group loans by client and calculate payment status
+    clientsMap := make(map[uint]*models.Client)
+    for _, loan := range loans {
+        if client, exists := clientsMap[loan.ClientID]; exists {
+            client.Loans = append(client.Loans, loan)
+        } else {
+            clientsMap[loan.ClientID] = &models.Client{
+                BaseModel:      loan.Client.BaseModel, // Use BaseModel instead of ID
+                ControlNumber:  loan.Client.ControlNumber,
+                FirstName:      loan.Client.FirstName,
+                LastName:       loan.Client.LastName,
+                Loans:          []models.Loan{loan},
+            }
+        }
+    }
+
+    // Convert map to slice
+    clients := make([]models.Client, 0, len(clientsMap))
+    for _, client := range clientsMap {
+        clients = append(clients, *client)
+    }
+
+    return clients, nil
+}
+
+// GetAllClientsWithLoans retrieves all clients with their loans
+func (s *LoanService) GetAllClientsWithLoans() ([]models.Client, error) {
+    clients, err := s.clientRepo.FindAll(0, 0, "") // 0,0 means no pagination
+    if err != nil {
+        return nil, err
+    }
+
+    // Load loans for each client
+    for i := range clients {
+        loans, err := s.loanRepo.FindByClientID(clients[i].ID)
+        if err == nil {
+            clients[i].Loans = loans
+        }
+    }
+
+    return clients, nil
 }

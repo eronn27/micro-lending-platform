@@ -4,6 +4,7 @@ import (
     "micro-lending-platform/backend/internal/models"
     "gorm.io/gorm"
     "fmt"
+    "time"
 )
 
 type LoanRepository struct {
@@ -195,23 +196,54 @@ func (r *LoanRepository) FindByControlNumber(controlNumber string) (*models.Loan
 }
 
 
-// Add this method to the LoanRepository
-func (r *LoanRepository) UpdateBalanceAndProgress(loanID uint, newBalance float64, paidWeeks int, status models.LoanStatus) error {
+
+// FindWithPartialPayments retrieves loans with their partial payments
+func (r *LoanRepository) FindWithPartialPayments(offset, limit int) ([]models.Loan, error) {
+    var loans []models.Loan
+
+    query := r.db.Preload("Client").Preload("Payments", "status = ?", models.PaymentStatusPartial)
+
+    if limit > 0 {
+        query = query.Offset(offset).Limit(limit)
+    }
+
+    result := query.Order("created_at DESC").Find(&loans)
+
+    if result.Error != nil {
+        return nil, result.Error
+    }
+    return loans, nil
+}
+
+// UpdateBalanceAndProgress updates loan balance and paid weeks
+func (r *LoanRepository) UpdateBalanceAndProgress(loanID uint, balance float64, paidWeeks int, status models.LoanStatus) error {
     result := r.db.Model(&models.Loan{}).
         Where("id = ?", loanID).
         Updates(map[string]interface{}{
-            "outstanding_balance": newBalance,
-            "paid_weeks":          paidWeeks,
-            "status":              status,
+            "outstanding_balance": balance,
+            "paid_weeks": paidWeeks,
+            "status": status,
+            "updated_at": time.Now(),
         })
 
+    return result.Error
+}
+
+// GetLoansForPayments retrieves loans that need payment attention
+func (r *LoanRepository) GetLoansForPayments() ([]models.Loan, error) {
+    var loans []models.Loan
+
+    // Get loans that are active and not fully paid
+    result := r.db.Preload("Client").
+        Preload("Payments", func(db *gorm.DB) *gorm.DB {
+            return db.Where("status IN ?", []models.PaymentStatus{models.PaymentStatusPartial, models.PaymentStatusPaid})
+        }).
+        Where("status = ? AND outstanding_balance > 0", models.LoanStatusActive).
+        Order("created_at ASC").
+        Find(&loans)
+
     if result.Error != nil {
-        return result.Error
+        return nil, result.Error
     }
-
-    if result.RowsAffected == 0 {
-        return fmt.Errorf("loan not found")
-    }
-
-    return nil
+    return loans, nil
 }

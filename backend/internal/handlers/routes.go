@@ -15,13 +15,12 @@ func SetupRoutes(
 	paymentService *services.PaymentService,
 	reportService *services.ReportService,
 ) {
-	// Initialize handlers
+	// Initialize handlers - update clientHandler to include loanService
 	authHandler := NewAuthHandler(authService)
-	clientHandler := NewClientHandler(clientService)
+	clientHandler := NewClientHandler(clientService, loanService) // Updated
 	loanHandler := NewLoanHandler(loanService)
 	paymentHandler := NewPaymentHandler(paymentService)
 	reportHandler := NewReportHandler(reportService)
-
 
 	// API v1 group
 	v1 := router.Group("/api/v1")
@@ -62,6 +61,7 @@ func setupClientRoutes(rg *gin.RouterGroup, h *ClientHandler) {
 	clients.Use(auth.AuthMiddleware())
 
 	{
+		// Basic CRUD operations
 		clients.GET("", h.GetAllClients)
 		clients.POST("", h.CreateClient)
 		clients.POST("/simple", h.CreateSimpleClient)
@@ -71,14 +71,21 @@ func setupClientRoutes(rg *gin.RouterGroup, h *ClientHandler) {
 		clients.DELETE("/:id", h.DeleteClient)
 		clients.PATCH("/:id/restore", h.RestoreClient)
 
+		// Search and utilities
 		clients.GET("/search", h.SearchClients)
 		clients.GET("/check-duplicate", h.CheckDuplicate)
 		clients.GET("/control-number/:controlNumber", h.GetClientByControlNumber)
 
+		// Reports and analytics
 		clients.GET("/stats", h.GetClientStats)
 		clients.GET("/export", h.ExportClients)
 
+		// Bulk operations
 		clients.POST("/bulk", h.BulkCreateClients)
+
+		// Payment management endpoints
+		clients.GET("/for-payments", h.GetClientsForPayments)
+		clients.GET("/payment-overview", h.GetClientPaymentOverview)
 	}
 }
 
@@ -88,14 +95,15 @@ func setupLoanRoutes(rg *gin.RouterGroup, h *LoanHandler) {
 	loans.Use(auth.AuthMiddleware())
 
 	{
-		loans.GET("", h.GetAllLoans)
-		loans.POST("", h.CreateLoan)
-		loans.GET("/:id", h.GetLoanByID)
-		loans.PUT("/:id", h.UpdateLoan)
-		loans.DELETE("/:id", h.DeleteLoan)
-
-		loans.GET("/client/:clientId", h.GetLoansByClientID)
-		loans.GET("/stats", h.GetLoanStats)
+		loans.POST("", h.CreateLoan)                    // Create new loan
+		loans.GET("/client/:clientId", h.GetLoansByClientID) // Get all loans for client
+		loans.GET("/:id", h.GetLoan)                    // Get single loan
+		loans.PUT("/:id", h.UpdateLoan)                 // Update loan
+		loans.DELETE("/:id", h.DeleteLoan)              // Delete loan
+		
+		// Additional loan routes that might be needed
+		loans.GET("", h.GetAllLoans)                    // Get all loans with pagination
+		loans.GET("/stats", h.GetLoanStats)             // Get loan statistics
 	}
 }
 
@@ -110,6 +118,7 @@ func setupPaymentRoutes(rg *gin.RouterGroup, h *PaymentHandler) {
 		payments.GET("/:id", h.GetPaymentByID)
 		payments.PUT("/:id", h.UpdatePayment)
 		payments.DELETE("/:id", h.DeletePayment)
+		payments.GET("/loan/:loanId/progress", h.GetPaymentProgress) // NEW ENDPOINT
 
 		payments.GET("/loan/:loanId", h.GetPaymentsByLoanID)
 	}

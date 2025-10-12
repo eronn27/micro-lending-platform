@@ -372,3 +372,20 @@ func (r *ClientRepository) CreateSimple(client *models.Client) (*models.Client, 
     }
     return client, nil
 }
+
+// FindWithActiveLoans retrieves clients with their active loans
+func (r *ClientRepository) FindWithActiveLoans() ([]models.Client, error) {
+    var clients []models.Client
+
+    result := r.db.
+        Preload("Loans", "status IN ?", []string{"Active", "Overdue"}).
+        Where("EXISTS (SELECT 1 FROM loans WHERE loans.client_id = clients.id AND loans.status IN ?)",
+            []string{"Active", "Overdue"}).
+        Find(&clients)
+
+    if result.Error != nil {
+        return nil, result.Error
+    }
+
+    return clients, nil
+}

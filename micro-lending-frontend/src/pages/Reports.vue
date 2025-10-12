@@ -105,18 +105,6 @@ Create file: `micro-lending-frontend/src/pages/reports/Reports.vue`
           </div>
         </div>
 
-        <!-- Client Health Card -->
-        <div class="metric-card health">
-          <div class="metric-icon">📊</div>
-          <div class="metric-content">
-            <h3>Client Health</h3>
-            <div class="metric-value">{{ getClientHealthPercentage() }}%</div>
-            <p class="metric-description">Healthy vs total clients ratio</p>
-          </div>
-          <div class="metric-trend positive">
-            <span>{{ reportData.active_clients }} Active</span>
-          </div>
-        </div>
       </div>
 
       <!-- Detailed Analytics Section -->
@@ -193,33 +181,6 @@ Create file: `micro-lending-frontend/src/pages/reports/Reports.vue`
             </div>
           </div>
 
-          <!-- Health Indicators -->
-          <div class="analytics-card">
-            <h3>Health Indicators</h3>
-            <div class="analytics-content">
-              <div class="progress-item">
-                <label>Active Rate</label>
-                <div class="progress-bar">
-                  <div class="progress-fill" :style="{ width: getActivePercentage() + '%', backgroundColor: '#10b981' }"></div>
-                </div>
-                <span class="progress-label">{{ getActivePercentage() }}%</span>
-              </div>
-              <div class="progress-item">
-                <label>Overdue Rate</label>
-                <div class="progress-bar">
-                  <div class="progress-fill" :style="{ width: getOverduePercentage() + '%', backgroundColor: '#ef4444' }"></div>
-                </div>
-                <span class="progress-label">{{ getOverduePercentage() }}%</span>
-              </div>
-              <div class="progress-item">
-                <label>Health Score</label>
-                <div class="progress-bar">
-                  <div class="progress-fill" :style="{ width: getClientHealthPercentage() + '%', backgroundColor: '#3b82f6' }"></div>
-                </div>
-                <span class="progress-label">{{ getClientHealthPercentage() }}%</span>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
 

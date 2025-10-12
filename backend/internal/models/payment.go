@@ -2,36 +2,56 @@ package models
 
 import (
     "time"
+    "gorm.io/gorm"
 )
 
 type PaymentStatus string
 
 const (
-    PaymentStatusPending PaymentStatus = "Pending"
-    PaymentStatusPaid    PaymentStatus = "Paid"
-    PaymentStatusOverdue PaymentStatus = "Overdue"
-    PaymentStatusPartial PaymentStatus = "Partial"
+    PaymentStatusPending  PaymentStatus = "Pending"
+    PaymentStatusPaid     PaymentStatus = "Paid"
+    PaymentStatusPartial  PaymentStatus = "Partial"
+    PaymentStatusOverdue  PaymentStatus = "Overdue"
 )
 
 type Payment struct {
-    BaseModel
-    LoanID       uint          `gorm:"not null;index" json:"loan_id"`
-    WeekNumber   int           `gorm:"not null" json:"week_number"`
-    PaymentDate  time.Time     `json:"payment_date"`
-    AmountDue    float64       `gorm:"type:decimal(10,2);not null" json:"amount_due"`
-    AmountPaid   float64       `gorm:"type:decimal(10,2)" json:"amount_paid"`
-    Status       PaymentStatus `gorm:"size:20;default:'Pending'" json:"status"`
-    PaymentMethod string       `gorm:"size:50" json:"payment_method"`
+    ID              uint          `json:"id" gorm:"primaryKey"`
+    LoanID          uint          `json:"loan_id"`
+    WeekNumber      int           `json:"week_number"`
+    PaymentDate     time.Time     `json:"payment_date"`
+    AmountDue       float64       `json:"amount_due" gorm:"type:decimal(10,2)"`
+    AmountPaid      float64       `json:"amount_paid" gorm:"type:decimal(10,2)"`
+    RemainingBalance float64      `json:"remaining_balance" gorm:"type:decimal(10,2);default:0"`
+    Status          PaymentStatus `json:"status" gorm:"type:varchar(20)"`
+    PaymentMethod   string        `json:"payment_method" gorm:"type:varchar(50)"`
+    IsPartial       bool          `json:"is_partial" gorm:"default:false"`
+    CompletesWeek   bool          `json:"completes_week" gorm:"default:false"`
+    CreatedAt       time.Time     `json:"created_at"`
+    UpdatedAt       time.Time     `json:"updated_at"`
+    DeletedAt       gorm.DeletedAt `json:"deleted_at" gorm:"index"`
     
-    // Relationship
-    Loan Loan `gorm:"foreignKey:LoanID" json:"loan,omitempty"`
+    // Relations
+    Loan *Loan `json:"loan,omitempty" gorm:"foreignKey:LoanID"`
 }
 
-func (Payment) TableName() string {
-    return "payments"
+type PaymentCreateRequest struct {
+    LoanID          uint    `json:"loan_id" binding:"required"`
+    WeekNumber      int     `json:"week_number" binding:"required"`
+    PaymentDate     string  `json:"payment_date,omitempty"`
+    AmountDue       float64 `json:"amount_due" binding:"required"`
+    AmountPaid      float64 `json:"amount_paid" binding:"required"`
+    RemainingBalance float64 `json:"remaining_balance,omitempty"`
+    Status          string  `json:"status" binding:"required"`
+    PaymentMethod   string  `json:"payment_method" binding:"required"`
+    IsPartial       bool    `json:"is_partial,omitempty"`
+    CompletesWeek   bool    `json:"completes_week,omitempty"`
+}
+type LoanUpdateRequest struct {
+    ID                 uint     `json:"id"`
+    OutstandingBalance *float64 `json:"outstanding_balance,omitempty"`
+    Status             string   `json:"status,omitempty"`
+    PaymentPeriodWeeks *int     `json:"payment_period_weeks,omitempty"`
+    DueDate            string   `json:"due_date,omitempty"`
 }
 
-// Unique constraint for loan_id and week_number
-func (Payment) Constraints() []string {
-    return []string{"UNIQUE(loan_id, week_number)"}
-}
+

@@ -53,6 +53,12 @@ const router = createRouter({
             component: () => import('../pages/Reports.vue'),
             meta: { requiresAuth: true }
         },
+	{
+            path: '/clients/:id/new-loan',
+            name: 'LoanForm',
+            component: () => import('../pages/LoanForm.vue'),
+            meta: { requiresAuth: true }
+        },
 
         {
             path: '/',

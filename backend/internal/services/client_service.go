@@ -80,6 +80,7 @@ func (s *ClientService) CreateClientWithRelatedData(req *models.ClientCreateRequ
 
     return createdClientData, nil
 }
+
 // Fix the CreateClient method in client_service.go
 func (s *ClientService) CreateClient(req *models.ClientCreate) (*models.Client, error) {
     // Parse date of birth
@@ -131,6 +132,7 @@ func (s *ClientService) CreateClient(req *models.ClientCreate) (*models.Client, 
 
     return createdClient, nil
 }
+
 // GetClientByID retrieves a client by ID
 func (s *ClientService) GetClientByID(id uint) (*models.Client, error) {
     client, err := s.clientRepo.FindByID(id)
@@ -169,6 +171,15 @@ func (s *ClientService) GetAllClients(page, limit int, search string) ([]models.
     clients, err := s.clientRepo.FindAll(offset, limit, search)
     if err != nil {
         return nil, 0, fmt.Errorf("failed to get clients: %w", err)
+    }
+
+    // Debug: Check if loans are loaded
+    for _, client := range clients {
+        fmt.Printf("Client %d (%s %s) - Loans count: %d\n", 
+            client.ID, client.FirstName, client.LastName, len(client.Loans))
+        if len(client.Loans) > 0 {
+            fmt.Printf("  Loan: %+v\n", client.Loans[0])
+        }
     }
 
     total, err := s.clientRepo.Count(search)
@@ -394,7 +405,7 @@ func (s *ClientService) generateLoanControlNumber() string {
     timestamp := time.Now().Unix()
     return fmt.Sprintf("LOAN-%d", timestamp)
 }
-// ... (previous code remains the same)
+
 // Update the parseDate function in client_service.go
 func (s *ClientService) parseDate(dateStr string) (time.Time, error) {
     if dateStr == "" {
@@ -402,8 +413,8 @@ func (s *ClientService) parseDate(dateStr string) (time.Time, error) {
     }
     // Directly parse the Vue date format
     return time.Parse("2006-01-02", dateStr)    
-    
 }
+
 // Update the convertRequestToClientData function in client_service.go
 func (s *ClientService) convertRequestToClientData(req *models.ClientCreateRequest) (*models.ClientWithRelatedData, error) {
     // Parse dates for client
@@ -545,4 +556,13 @@ func (s *ClientService) convertRequestToClientData(req *models.ClientCreateReque
         Spouse:     spouse,
         Dependents: dependents,
     }, nil
+}
+
+// GetClientsWithActiveLoans retrieves clients with their active loans for payment management
+func (s *ClientService) GetClientsWithActiveLoans() ([]models.Client, error) {
+    clients, err := s.clientRepo.FindWithActiveLoans()
+    if err != nil {
+        return nil, fmt.Errorf("failed to get clients with active loans: %w", err)
+    }
+    return clients, nil
 }
