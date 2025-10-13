@@ -1,15 +1,10 @@
-# Reports.vue Component
-
-Create file: `micro-lending-frontend/src/pages/reports/Reports.vue`
-
-```vue
 <template>
   <div class="reports-container">
     <!-- Header -->
     <header class="reports-header">
       <div class="header-content">
         <h1>Reports & Analytics</h1>
-        <p class="subtitle">Weekly performance metrics and key statistics</p>
+        <p class="subtitle">{{ getPeriodDescription() }}</p>
       </div>
       <div class="header-actions">
         <button @click="refreshData" :disabled="loading" class="btn-refresh">
@@ -22,31 +17,117 @@ Create file: `micro-lending-frontend/src/pages/reports/Reports.vue`
       </div>
     </header>
 
+    <!-- Period Toggle Buttons -->
+    <div class="period-toggle">
+      <button
+        @click="setPeriod('weekly')"
+        :class="['period-btn', { active: selectedPeriod === 'weekly' }]"
+      >
+        📅 Weekly
+      </button>
+      <button
+        @click="setPeriod('monthly')"
+        :class="['period-btn', { active: selectedPeriod === 'monthly' }]"
+      >
+        📆 Monthly
+      </button>
+      <button
+        @click="toggleHistory"
+        :class="['period-btn', { active: showHistory }]"
+      >
+        📊 History
+      </button>
+    </div>
+
+    <!-- History View -->
+    <div v-if="showHistory" class="history-view">
+      <div class="history-header">
+        <h2>Historical Metrics</h2>
+        <div class="history-controls">
+          <select v-model="historyPeriod" @change="loadHistoricalData" class="history-select">
+            <option value="weekly">Weekly History</option>
+            <option value="monthly">Monthly History</option>
+          </select>
+          <select v-model="historyRange" @change="loadHistoricalData" class="history-select">
+            <option value="4">Last 4 Periods</option>
+            <option value="8">Last 8 Periods</option>
+            <option value="12">Last 12 Periods</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Historical Data Table -->
+      <div class="history-table-container">
+        <table class="history-table">
+          <thead>
+            <tr>
+              <th>Period</th>
+              <th>Total Payments</th>
+              <th>Total Releases</th>
+              <th>Active Clients</th>
+              <th>Overdue Clients</th>
+              <th>Net Flow</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="(record, index) in historicalData" :key="index">
+              <td class="period-cell">{{ record.period }}</td>
+              <td class="amount-cell">₱{{ formatCurrency(record.payments) }}</td>
+              <td class="amount-cell">₱{{ formatCurrency(record.releases) }}</td>
+              <td class="number-cell">{{ record.activeClients }}</td>
+              <td class="number-cell">{{ record.overdueClients }}</td>
+              <td :class="['amount-cell', record.netFlow >= 0 ? 'positive' : 'negative']">
+                ₱{{ formatCurrency(Math.abs(record.netFlow)) }}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- History Summary Cards -->
+      <div class="history-summary">
+        <div class="summary-card">
+          <h4>Average Payments</h4>
+          <p class="summary-value">₱{{ formatCurrency(getHistoryAverage('payments')) }}</p>
+        </div>
+        <div class="summary-card">
+          <h4>Average Releases</h4>
+          <p class="summary-value">₱{{ formatCurrency(getHistoryAverage('releases')) }}</p>
+        </div>
+        <div class="summary-card">
+          <h4>Trend</h4>
+          <p :class="['summary-value', getTrendClass()]">
+            {{ getTrendText() }}
+          </p>
+        </div>
+      </div>
+    </div>
+
     <!-- Loading State -->
-    <div v-if="loading" class="loading-state">
+    <div v-if="loading && !showHistory" class="loading-state">
       <div class="spinner"></div>
       <p>Loading reports...</p>
     </div>
 
     <!-- Error State -->
-    <div v-if="error" class="error-state">
+    <div v-if="error && !showHistory" class="error-state">
       <div class="error-icon">⚠️</div>
       <h3>Failed to load reports</h3>
       <p>{{ error }}</p>
       <button @click="refreshData" class="btn-retry">Try Again</button>
     </div>
 
-    <!-- Main Content -->
-    <div v-if="!loading && !error" class="reports-content">
+    <!-- Main Content (Current Period) -->
+    <div v-if="!loading && !error && !showHistory" class="reports-content">
       <!-- Key Metrics Grid -->
       <div class="metrics-grid">
         <!-- Weekly Payments Card -->
         <div class="metric-card payments">
           <div class="metric-icon">💰</div>
           <div class="metric-content">
-            <h3>Weekly Payments</h3>
+            <h3>{{ selectedPeriod === 'weekly' ? 'Weekly' : 'Monthly' }} Payments</h3>
             <div class="metric-value">₱{{ formatCurrency(reportData.weekly_payment_total) }}</div>
-            <p class="metric-description">Total payments received this week</p>
+            <p class="metric-description">Total payments received</p>
           </div>
           <div class="metric-trend positive">
             <span>↑ Active</span>
@@ -57,7 +138,7 @@ Create file: `micro-lending-frontend/src/pages/reports/Reports.vue`
         <div class="metric-card releases">
           <div class="metric-icon">📤</div>
           <div class="metric-content">
-            <h3>Weekly Releases</h3>
+            <h3>{{ selectedPeriod === 'weekly' ? 'Weekly' : 'Monthly' }} Releases</h3>
             <div class="metric-value">₱{{ formatCurrency(reportData.weekly_release_total) }}</div>
             <p class="metric-description">Total loan amounts released</p>
           </div>
@@ -105,6 +186,18 @@ Create file: `micro-lending-frontend/src/pages/reports/Reports.vue`
           </div>
         </div>
 
+        <!-- Client Health Card -->
+        <div class="metric-card health">
+          <div class="metric-icon">📊</div>
+          <div class="metric-content">
+            <h3>Client Health</h3>
+            <div class="metric-value">{{ getClientHealthPercentage() }}%</div>
+            <p class="metric-description">Healthy vs total clients ratio</p>
+          </div>
+          <div class="metric-trend positive">
+            <span>{{ reportData.active_clients }} Active</span>
+          </div>
+        </div>
       </div>
 
       <!-- Detailed Analytics Section -->
@@ -117,7 +210,7 @@ Create file: `micro-lending-frontend/src/pages/reports/Reports.vue`
             <h3>Payment Summary</h3>
             <div class="analytics-content">
               <div class="stat-row">
-                <span class="stat-label">Total This Week:</span>
+                <span class="stat-label">Total This {{ selectedPeriod === 'weekly' ? 'Week' : 'Month' }}:</span>
                 <span class="stat-value">₱{{ formatCurrency(reportData.weekly_payment_total) }}</span>
               </div>
               <div class="stat-row">
@@ -138,7 +231,7 @@ Create file: `micro-lending-frontend/src/pages/reports/Reports.vue`
             <h3>Release Summary</h3>
             <div class="analytics-content">
               <div class="stat-row">
-                <span class="stat-label">Total This Week:</span>
+                <span class="stat-label">Total This {{ selectedPeriod === 'weekly' ? 'Week' : 'Month' }}:</span>
                 <span class="stat-value">₱{{ formatCurrency(reportData.weekly_release_total) }}</span>
               </div>
               <div class="stat-row">
@@ -148,7 +241,7 @@ Create file: `micro-lending-frontend/src/pages/reports/Reports.vue`
                 </span>
               </div>
               <div class="stat-row">
-                <span class="stat-label">Total Payment vs Release:</span>
+                <span class="stat-label">Payment vs Release Ratio:</span>
                 <span class="stat-value" :class="getPaymentReleaseRatio() > 1 ? 'positive' : 'neutral'">
                   {{ getPaymentReleaseRatio().toFixed(2) }}x
                 </span>
@@ -181,6 +274,33 @@ Create file: `micro-lending-frontend/src/pages/reports/Reports.vue`
             </div>
           </div>
 
+          <!-- Health Indicators -->
+          <div class="analytics-card">
+            <h3>Health Indicators</h3>
+            <div class="analytics-content">
+              <div class="progress-item">
+                <label>Active Rate</label>
+                <div class="progress-bar">
+                  <div class="progress-fill" :style="{ width: getActivePercentage() + '%', backgroundColor: '#10b981' }"></div>
+                </div>
+                <span class="progress-label">{{ getActivePercentage() }}%</span>
+              </div>
+              <div class="progress-item">
+                <label>Overdue Rate</label>
+                <div class="progress-bar">
+                  <div class="progress-fill" :style="{ width: getOverduePercentage() + '%', backgroundColor: '#ef4444' }"></div>
+                </div>
+                <span class="progress-label">{{ getOverduePercentage() }}%</span>
+              </div>
+              <div class="progress-item">
+                <label>Health Score</label>
+                <div class="progress-bar">
+                  <div class="progress-fill" :style="{ width: getClientHealthPercentage() + '%', backgroundColor: '#3b82f6' }"></div>
+                </div>
+                <span class="progress-label">{{ getClientHealthPercentage() }}%</span>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -207,6 +327,11 @@ const loading = ref(false)
 const error = ref(null)
 const lastUpdated = ref('-')
 const notification = ref({ show: false, message: '', type: 'success' })
+const selectedPeriod = ref('weekly')
+const showHistory = ref(false)
+const historyPeriod = ref('weekly')
+const historyRange = ref('4')
+const historicalData = ref([])
 
 const reportData = ref({
   weekly_payment_total: 0,
@@ -222,7 +347,8 @@ const fetchReports = async () => {
   loading.value = true
   error.value = null
   try {
-    const response = await reportService.getWeeklyReport()
+    const endpoint = selectedPeriod.value === 'weekly' ? 'getWeeklyReport' : 'getMonthlyReport'
+    const response = await reportService[endpoint]()
     reportData.value = response.data
     lastUpdated.value = new Date().toLocaleTimeString('en-PH')
   } catch (err) {
@@ -233,9 +359,108 @@ const fetchReports = async () => {
   }
 }
 
-const refreshData = () => {
+const setPeriod = (period) => {
+  selectedPeriod.value = period
+  showHistory.value = false
   fetchReports()
-  showNotification('Reports refreshed successfully')
+}
+
+const toggleHistory = () => {
+  showHistory.value = !showHistory.value
+  if (showHistory.value) {
+    loadHistoricalData()
+  }
+}
+
+const loadHistoricalData = () => {
+  // Generate mock historical data
+  // In production, this would call an API endpoint
+  const periods = parseInt(historyRange.value)
+  const data = []
+  
+  const now = new Date()
+  
+  for (let i = periods - 1; i >= 0; i--) {
+    const periodDate = new Date(now)
+    
+    if (historyPeriod.value === 'weekly') {
+      periodDate.setDate(periodDate.getDate() - (i * 7))
+      const weekEnd = new Date(periodDate)
+      weekEnd.setDate(periodDate.getDate() + 6)
+      
+      data.push({
+        period: `${formatDateShort(periodDate)} - ${formatDateShort(weekEnd)}`,
+        payments: Math.random() * 150000 + 50000,
+        releases: Math.random() * 200000 + 100000,
+        activeClients: Math.floor(Math.random() * 50 + 300),
+        overdueClients: Math.floor(Math.random() * 30 + 20),
+        netFlow: (Math.random() * 100000) - 50000
+      })
+    } else {
+      periodDate.setMonth(periodDate.getMonth() - i)
+      
+      data.push({
+        period: periodDate.toLocaleDateString('en-PH', { year: 'numeric', month: 'long' }),
+        payments: Math.random() * 600000 + 200000,
+        releases: Math.random() * 800000 + 400000,
+        activeClients: Math.floor(Math.random() * 50 + 300),
+        overdueClients: Math.floor(Math.random() * 30 + 20),
+        netFlow: (Math.random() * 400000) - 200000
+      })
+    }
+  }
+  
+  historicalData.value = data
+}
+
+const getHistoryAverage = (field) => {
+  if (historicalData.value.length === 0) return 0
+  const sum = historicalData.value.reduce((acc, record) => acc + record[field], 0)
+  return sum / historicalData.value.length
+}
+
+const getTrendText = () => {
+  if (historicalData.value.length < 2) return 'N/A'
+  
+  const recent = historicalData.value[historicalData.value.length - 1].payments
+  const previous = historicalData.value[historicalData.value.length - 2].payments
+  const change = ((recent - previous) / previous * 100).toFixed(1)
+  
+  if (change > 0) return `↑ ${change}%`
+  if (change < 0) return `↓ ${Math.abs(change)}%`
+  return '→ No Change'
+}
+
+const getTrendClass = () => {
+  if (historicalData.value.length < 2) return 'neutral'
+  
+  const recent = historicalData.value[historicalData.value.length - 1].payments
+  const previous = historicalData.value[historicalData.value.length - 2].payments
+  
+  if (recent > previous) return 'positive'
+  if (recent < previous) return 'negative'
+  return 'neutral'
+}
+
+const formatDateShort = (date) => {
+  return date.toLocaleDateString('en-PH', { month: 'short', day: 'numeric' })
+}
+
+const getPeriodDescription = () => {
+  if (showHistory) return 'Historical performance metrics'
+  return selectedPeriod.value === 'weekly' 
+    ? 'Weekly performance metrics and key statistics'
+    : 'Monthly performance metrics and key statistics'
+}
+
+const refreshData = () => {
+  if (showHistory) {
+    loadHistoricalData()
+    showNotification('History refreshed successfully')
+  } else {
+    fetchReports()
+    showNotification('Reports refreshed successfully')
+  }
 }
 
 const formatCurrency = (amount) => {
@@ -292,13 +517,14 @@ const getPaymentReleaseRatio = () => {
 
 const exportReport = () => {
   const reportContent = {
+    period: selectedPeriod.value,
     timestamp: new Date().toISOString(),
-    weeklyPayments: reportData.value.weekly_payment_total,
-    weeklyReleases: reportData.value.weekly_release_total,
-    totalClients: reportData.value.total_clients,
-    activeClients: reportData.value.active_clients,
-    overdueClients: reportData.value.overdue_clients,
-    clientHealth: getClientHealthPercentage()
+    data: reportData.value,
+    calculations: {
+      activePercentage: getActivePercentage(),
+      overduePercentage: getOverduePercentage(),
+      clientHealth: getClientHealthPercentage()
+    }
   }
 
   const dataStr = JSON.stringify(reportContent, null, 2)
@@ -306,7 +532,7 @@ const exportReport = () => {
   const url = URL.createObjectURL(dataBlob)
   const link = document.createElement('a')
   link.href = url
-  link.download = `report-${new Date().toISOString().split('T')[0]}.json`
+  link.download = `report-${selectedPeriod.value}-${new Date().toISOString().split('T')[0]}.json`
   link.click()
   showNotification('Report exported successfully')
 }
@@ -324,6 +550,7 @@ onMounted(() => {
 </script>
 
 <style scoped>
+/* Existing styles remain the same... */
 .reports-container {
   padding: 2rem;
   max-width: 1400px;
@@ -332,6 +559,186 @@ onMounted(() => {
   min-height: 100vh;
 }
 
+/* Period Toggle Buttons */
+.period-toggle {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 2rem;
+  background: white;
+  padding: 1rem;
+  border-radius: 12px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.07);
+  justify-content: center;
+}
+
+.period-btn {
+  padding: 0.75rem 2rem;
+  border: 2px solid #e5e7eb;
+  border-radius: 8px;
+  background: white;
+  color: #6b7280;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.period-btn:hover {
+  border-color: #3b82f6;
+  color: #3b82f6;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);
+}
+
+.period-btn.active {
+  background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+  color: white;
+  border-color: #3b82f6;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+}
+
+/* History View */
+.history-view {
+  background: white;
+  border-radius: 12px;
+  padding: 2rem;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.07);
+  margin-bottom: 2rem;
+}
+
+.history-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+  padding-bottom: 1rem;
+  border-bottom: 2px solid #e5e7eb;
+}
+
+.history-header h2 {
+  margin: 0;
+  color: #1f2937;
+  font-size: 1.5rem;
+}
+
+.history-controls {
+  display: flex;
+  gap: 1rem;
+}
+
+.history-select {
+  padding: 0.5rem 1rem;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+
+.history-select:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.history-table-container {
+  overflow-x: auto;
+  margin-bottom: 2rem;
+}
+
+.history-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.history-table thead {
+  background: #f8fafc;
+}
+
+.history-table th {
+  padding: 1rem;
+  text-align: left;
+  font-weight: 600;
+  color: #374151;
+  font-size: 0.875rem;
+  border-bottom: 2px solid #e5e7eb;
+}
+
+.history-table td {
+  padding: 1rem;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.period-cell {
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.amount-cell {
+  font-family: 'Courier New', monospace;
+  font-weight: 600;
+  color: #059669;
+}
+
+.amount-cell.positive {
+  color: #059669;
+}
+
+.amount-cell.negative {
+  color: #dc2626;
+}
+
+.number-cell {
+  text-align: center;
+  font-weight: 500;
+  color: #1f2937;
+}
+
+.history-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1.5rem;
+}
+
+.summary-card {
+  background: #f8fafc;
+  padding: 1.5rem;
+  border-radius: 8px;
+  text-align: center;
+}
+
+.summary-card h4 {
+  margin: 0 0 0.5rem 0;
+  color: #6b7280;
+  font-size: 0.875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.summary-value {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #1f2937;
+  font-family: 'Courier New', monospace;
+}
+
+.summary-value.positive {
+  color: #059669;
+}
+
+.summary-value.negative {
+  color: #dc2626;
+}
+
+.summary-value.neutral {
+  color: #6b7280;
+}
+
+/* Rest of existing styles... */
 .reports-header {
   display: flex;
   justify-content: space-between;
@@ -748,6 +1155,25 @@ onMounted(() => {
   .analytics-grid {
     grid-template-columns: 1fr;
   }
+  
+  .period-toggle {
+    flex-wrap: wrap;
+  }
+  
+  .history-header {
+    flex-direction: column;
+    gap: 1rem;
+    align-items: flex-start;
+  }
+  
+  .history-controls {
+    width: 100%;
+    flex-direction: column;
+  }
+  
+  .history-select {
+    width: 100%;
+  }
 }
 
 @media (max-width: 768px) {
@@ -775,6 +1201,25 @@ onMounted(() => {
 
   .metric-value {
     font-size: 1.5rem;
+  }
+  
+  .period-toggle {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  
+  .period-btn {
+    width: 100%;
+    justify-content: center;
+  }
+  
+  .history-table {
+    font-size: 0.75rem;
+  }
+  
+  .history-table th,
+  .history-table td {
+    padding: 0.5rem;
   }
 }
 </style>

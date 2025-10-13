@@ -52,10 +52,10 @@
       </div>
     </div>
 
-    <!-- Payment Management Table -->
-    <div class="table-section">
-      <h2 class="table-title">Payment Management</h2>
-      <p class="table-subtitle">Clients requiring payment attention</p>
+    <!-- Active Loans Section -->
+    <div class="table-section" v-if="activeClients.length > 0">
+      <h2 class="table-title">Active Loans - Requiring Attention</h2>
+      <p class="table-subtitle">Clients with pending payments</p>
       
       <div class="table-container">
         <table class="clients-table">
@@ -64,8 +64,8 @@
               <th class="checkbox-column">
                 <input
                   type="checkbox"
-                  v-model="selectAll"
-                  @change="toggleSelectAll"
+                  v-model="selectAllActive"
+                  @change="toggleSelectAllActive"
                 />
               </th>
               <th>Control #</th>
@@ -83,7 +83,7 @@
           </thead>
           <tbody>
             <tr
-              v-for="client in filteredClients"
+              v-for="client in activeClients"
               :key="client.id"
               :class="getRowClass(client)"
             >
@@ -117,18 +117,18 @@
                 ₱{{ formatCurrency(getLoanField(client, 'outstanding_balance')) }}
               </td>
 
-              <!-- Amortization (UPDATED) -->
+              <!-- Amortization -->
               <td class="amortization">
                 <div class="amortization-display">
                   <div class="full-amount">₱{{ formatCurrency(getLoanField(client, 'ammortization')) }}</div>
                   <div 
-                    v-if="getRemainingBalance(client) > 0" 
+                    v-if="getRemainingBalance(client) > 0 && getClientStatus(client) !== 'paid'" 
                     :class="['remaining-balance', getRemainingBalanceClass(client)]"
                   >
                     ₱{{ formatCurrency(getRemainingBalance(client)) }} remaining
                   </div>
                   <div 
-                    v-else-if="hasPartialPayments(client)"
+                    v-else-if="hasPartialPayments(client) && getClientStatus(client) !== 'paid'"
                     class="balance-paid"
                   >
                     Week completed with partial payments
@@ -156,7 +156,7 @@
                 <div class="progress-container">
                   <div class="progress-info">
                     {{ getPaidWeeks(client) }}/{{ getLoanField(client, 'payment_period_weeks') || 0 }} weeks
-                    <span v-if="hasPartialPayments(client)" class="partial-indicator">
+                    <span v-if="hasPartialPayments(client) && getClientStatus(client) !== 'paid'" class="partial-indicator">
                       (+{{ getCurrentWeekPartialPayments(client).length }} partial)
                     </span>
                   </div>
@@ -179,19 +179,21 @@
                 </span>
               </td>
 
-              <!-- Action (UPDATED) -->
+              <!-- Action -->
               <td class="action-cell">
                 <div class="action-buttons">
+                  <!-- For active loans with no remaining balance -->
                   <button
                     v-if="getClientStatus(client) !== 'paid' && getRemainingBalance(client) === 0"
                     @click="processPayment(client)"
-                    :disabled="isProcessingPayment(client.id) || isPaidToday(client)"
+                    :disabled="isProcessingPayment(client.id)"
                     :class="['btn-pay', { processing: isProcessingPayment(client.id) }]"
                   >
                     <span v-if="isProcessingPayment(client.id)">Processing...</span>
                     <span v-else>Complete Week</span>
                   </button>
                   
+                  <!-- For active loans with remaining balance -->
                   <button
                     v-if="getClientStatus(client) !== 'paid' && getRemainingBalance(client) > 0"
                     @click="openPartialPaymentModal(client)"
@@ -209,27 +211,130 @@
                   >
                     Pay Full ₱{{ formatCurrency(getRemainingBalance(client)) }}
                   </button>
-                  
-                  <span v-else-if="getClientStatus(client) === 'paid'" class="paid-text">🎉 Paid</span>
                 </div>
               </td>
             </tr>
           </tbody>
         </table>
-
-        <!-- Empty State -->
-        <div v-if="filteredClients.length === 0 && !loading" class="empty-state">
-          <div class="empty-icon">💸</div>
-          <h3>No clients found</h3>
-          <p>Try adjusting your search or filters</p>
-        </div>
-
-        <!-- Loading State -->
-        <div v-if="loading" class="loading-state">
-          <div class="spinner"></div>
-          <p>Loading payments...</p>
-        </div>
       </div>
+    </div>
+
+    <!-- Paid Loans Section -->
+    <div class="table-section paid-section" v-if="paidClients.length > 0">
+      <h2 class="table-title">
+        Completed Loans 
+        <span class="paid-count">({{ paidClients.length }})</span>
+      </h2>
+      <p class="table-subtitle">Clients who have completed their payments</p>
+      
+      <div class="table-container">
+        <table class="clients-table paid-table">
+          <thead>
+            <tr>
+              <th>Control #</th>
+              <th>Name</th>
+              <th>Date of Release</th>
+              <th>Final Balance</th>
+              <th>Amortization</th>
+              <th>Terms</th>
+              <th>Mode</th>
+              <th>Completion Date</th>
+              <th>Payment Progress</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              v-for="client in paidClients"
+              :key="'paid-' + client.id"
+              class="paid-row"
+            >
+              <!-- Control Number -->
+              <td class="control-number">
+                {{ client.control_number }}
+              </td>
+
+              <!-- Name -->
+              <td class="client-name">
+                {{ client.first_name }} {{ client.last_name }}
+              </td>
+
+              <!-- Date of Release -->
+              <td class="date-release">
+                {{ formatDate(getLoanField(client, 'date_of_release')) }}
+              </td>
+
+              <!-- Final Balance -->
+              <td class="amount">
+                ₱0.00
+              </td>
+
+              <!-- Amortization -->
+              <td class="amortization">
+                <div class="amortization-display">
+                  <div class="full-amount">₱{{ formatCurrency(getLoanField(client, 'ammortization')) }}</div>
+                  <div class="balance-paid">
+                    Fully Paid
+                  </div>
+                </div>
+              </td>
+
+              <!-- Terms (in months) -->
+              <td class="terms">
+                {{ getLoanField(client, 'terms') || 0 }} months
+              </td>
+
+              <!-- Mode -->
+              <td class="mode">
+                {{ getLoanField(client, 'mode') || 'Weekly' }}
+              </td>
+
+              <!-- Completion Date -->
+              <td class="due-date">
+                {{ getCompletionDate(client) || '-' }}
+              </td>
+
+              <!-- Payment Progress -->
+              <td class="progress-cell">
+                <div class="progress-container">
+                  <div class="progress-info">
+                    {{ getPaidWeeks(client) }}/{{ getLoanField(client, 'payment_period_weeks') || 0 }} weeks
+                  </div>
+                  <div class="progress-bar">
+                    <div
+                      class="progress-fill"
+                      :style="{
+                        width: '100%',
+                        backgroundColor: '#10b981'
+                      }"
+                    ></div>
+                  </div>
+                </div>
+              </td>
+
+              <!-- Status -->
+              <td class="status-cell">
+                <span class="status-badge status-paid">
+                  🎉 Paid in Full
+                </span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Empty State -->
+    <div v-if="filteredClients.length === 0 && !loading" class="empty-state">
+      <div class="empty-icon">💸</div>
+      <h3>No clients found</h3>
+      <p>Try adjusting your search or filters</p>
+    </div>
+
+    <!-- Loading State -->
+    <div v-if="loading" class="loading-state">
+      <div class="spinner"></div>
+      <p>Loading payments...</p>
     </div>
 
     <!-- Partial Payment Modal -->
@@ -349,9 +454,9 @@ const router = useRouter()
 // Reactive state
 const clients = ref([])
 const selectedClients = ref([])
-const selectAll = ref(false)
+const selectAllActive = ref(false)
 const searchQuery = ref('')
-const statusFilter = ref('all') // Default to show all loans
+const statusFilter = ref('active') // Default to active loans
 const processingPayments = ref(new Set())
 const processingBulk = ref(false)
 const loading = ref(false)
@@ -456,15 +561,6 @@ const getRemainingBalanceClass = (client) => {
   return 'balance-high'
 }
 
-// Status filters with counts - includes all statuses
-const statusFilters = computed(() => [
-  { label: 'All Loans', value: 'all', count: clients.value.length },
-  { label: 'Active', value: 'active', count: activeCount.value },
-  { label: 'Due Today', value: 'due_today', count: dueTodayCount.value },
-  { label: 'Overdue', value: 'overdue', count: overdueCount.value },
-  { label: 'Paid-in-Full', value: 'paid', count: paidCount.value }
-])
-
 // Computed properties
 const activeClients = computed(() => {
   return filteredClients.value.filter(client => getClientStatus(client) !== 'paid')
@@ -496,6 +592,15 @@ const filteredClients = computed(() => {
   })
 })
 
+// Status filters with counts - now includes all clients
+const statusFilters = computed(() => [
+  { label: 'Active Loans', value: 'active', count: activeCount.value },
+  { label: 'Due Today', value: 'due_today', count: dueTodayCount.value },
+  { label: 'Overdue', value: 'overdue', count: overdueCount.value },
+  { label: 'Paid-in-Full', value: 'paid', count: paidCount.value },
+  { label: 'All Clients', value: 'all', count: clients.value.length }
+])
+
 const dueTodayCount = computed(() => 
   clients.value.filter(client => getClientStatus(client) === 'due_today').length
 )
@@ -516,7 +621,7 @@ const paidCount = computed(() =>
 const fetchClients = async () => {
   loading.value = true
   try {
-    // Fetch all clients with their loans (both active and paid)
+    // Fetch all clients with their loans
     const response = await api.get('/clients')
     
     clients.value = response.data.clients?.map(client => {
@@ -530,7 +635,7 @@ const fetchClients = async () => {
       }
     }) || []
 
-    // Fetch payment progress for all clients (both active and paid)
+    // Fetch payment progress for all clients
     await Promise.all(clients.value.map(client => fetchPaymentProgress(client)))
     
   } catch (error) {
@@ -596,8 +701,18 @@ const getPaidWeeks = (client) => {
 
 // New method to get completion date for paid clients
 const getCompletionDate = (client) => {
-  const lastPaymentDate = getLoanField(client, 'last_payment_date') || getLoanField(client, 'updated_at')
+  // You might want to fetch this from your API or calculate it
+  const lastPaymentDate = getLoanField(client, 'last_payment_date')
   return lastPaymentDate ? formatDate(lastPaymentDate) : 'Completed'
+}
+
+// Updated select all for active clients only
+const toggleSelectAllActive = () => {
+  if (selectAllActive.value) {
+    selectedClients.value = activeClients.value.map(client => client.id)
+  } else {
+    selectedClients.value = []
+  }
 }
 
 const handleSearch = () => {
@@ -783,18 +898,9 @@ const processBulkPayments = async () => {
   }
 }
 
-const toggleSelectAll = () => {
-  if (selectAll.value) {
-    // Only select active clients (not paid ones)
-    selectedClients.value = activeClients.value.map(client => client.id)
-  } else {
-    selectedClients.value = []
-  }
-}
-
 const clearSelection = () => {
   selectedClients.value = []
-  selectAll.value = false
+  selectAllActive.value = false
 }
 
 const setStatusFilter = (filter) => {
@@ -807,7 +913,6 @@ const getRowClass = (client) => {
   if (status === 'due_today') classes.push('due-today-row')
   if (status === 'overdue') classes.push('overdue-row')
   if (selectedClients.value.includes(client.id)) classes.push('selected-row')
-  if (status === 'paid') classes.push('paid-row')
   return classes
 }
 
@@ -871,12 +976,12 @@ const showNotification = (message, type = 'success') => {
   }, 3000)
 }
 
-// Watch for changes in active clients to update select all checkbox
+// Update the watch to only consider active clients for selection
 watch(activeClients, (newActive) => {
   if (newActive.length > 0) {
-    selectAll.value = selectedClients.value.length === newActive.length
+    selectAllActive.value = selectedClients.value.length === newActive.length
   } else {
-    selectAll.value = false
+    selectAllActive.value = false
   }
 })
 
@@ -886,8 +991,114 @@ onMounted(() => {
 </script>
 
 <style scoped>
-/* Your existing CSS styles remain the same, just adding the new button style */
+.payment-management {
+  padding: 1.5rem;
+  max-width: 1600px;
+  margin: 0 auto;
+}
 
+/* Header Styles */
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.header-content {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.header-content h1 {
+  margin: 0;
+  color: #1f2937;
+  font-size: 1.75rem;
+}
+
+.due-today-badge {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: white;
+  padding: 0.5rem 1rem;
+  border-radius: 20px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.badge-count {
+  background: rgba(255, 255, 255, 0.2);
+  padding: 0.25rem 0.5rem;
+  border-radius: 12px;
+  font-size: 0.875rem;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.bulk-actions {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+}
+
+.btn-bulk-pay {
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-bulk-pay:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+}
+
+.btn-bulk-pay:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.btn-clear {
+  background: #6b7280;
+  color: white;
+  border: none;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.btn-clear:hover {
+  background: #4b5563;
+}
+
+/* Filters Section */
+.filters-section {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.search-box {
+  position: relative;
+  flex: 1;
+  min-width: 300px;
+}
 .btn-pay-full {
   background: linear-gradient(135deg, #3b82f6, #1d4ed8);
   color: white;
@@ -1665,3 +1876,4 @@ onMounted(() => {
   }
 }
 </style>
+
