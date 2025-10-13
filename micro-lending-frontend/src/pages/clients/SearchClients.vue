@@ -4,7 +4,7 @@
     <header class="page-header">
       <div class="logo-section">
         <div class="logo-placeholder">
-          <span class="logo-text">MLP</span>
+	 <img src="../../../public/Logo.png" class="logo-placeholder" alt="Logo"> 
         </div>
         <h1>Client Search</h1>
       </div>
