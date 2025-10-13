@@ -34,6 +34,29 @@ export const reportService = {
   },
 
   /**
+   * Fetch historical report data for multiple periods
+   * @param {string} periodType - 'weekly' or 'monthly'
+   * @param {number} periods - Number of periods to retrieve (1-52)
+   * @returns {Promise<Object>} Historical report data with metadata
+   */
+  async getHistoricalReport(periodType = 'weekly', periods = 4) {
+    try {
+      const response = await api.get('/reports/history', {
+        params: {
+          period: periodType,
+          periods: periods
+        }
+      })
+      return response.data
+    } catch (error) {
+      console.error('Error fetching historical report:', error)
+      throw new Error(
+        error.response?.data?.error || 'Failed to fetch historical reports'
+      )
+    }
+  },
+
+  /**
    * Export report as JSON
    * @param {Object} reportData - Report data to export
    * @param {string} fileName - Name of the file to export
