@@ -29,12 +29,6 @@ func main() {
         log.Fatal("Failed to run migrations:", err)
     }
 
-    // Create test data if running in development environment
-    if cfg.Environment == "development" {
-        if err := db.CreateTestData(); err != nil {
-            log.Printf("Warning: Failed to create test data: %v", err)
-        }
-    }
 
     // Configure Gin router based on environment
     if cfg.Environment == "production" {

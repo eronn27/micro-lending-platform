@@ -87,54 +87,6 @@ func (d *Database) RunAllMigrations(migrationsPath string) error {
     return nil
 }
 
-// CreateTestData populates database with sample data for development
-func (d *Database) CreateTestData() error {
-    log.Println("Creating test data...")
-
-    // Check if data already exists to avoid duplicates
-    var clientCount int64
-    if err := d.DB.Model(&models.Client{}).Count(&clientCount).Error; err != nil {
-        // Table might not exist yet - that's OK
-        log.Printf("Client table might not exist yet: %v", err)
-        return nil
-    }
-
-    if clientCount > 0 {
-        log.Println("Test data already exists, skipping...")
-        return nil
-    }
-
-    // Create sample client records
-    testClients := []models.Client{
-        {
-            ControlNumber:    "MLP-2024-001",
-            FirstName:        "Juan",
-            LastName:         "dela Cruz",
-            ContactNumber:    "09123456789",
-            HomeAddress:      "123 Main St, Manila",
-            Age:              35,
-            CivilStatus:      "Married",
-        },
-        {
-            ControlNumber:    "MLP-2024-002", 
-            FirstName:        "Maria",
-            LastName:         "Santos",
-            ContactNumber:    "09198765432",
-            HomeAddress:      "456 Oak Ave, Quezon City",
-            Age:              28,
-            CivilStatus:      "Single",
-        },
-    }
-
-    for i := range testClients {
-        if err := d.DB.Create(&testClients[i]).Error; err != nil {
-            return fmt.Errorf("failed to create test client %d: %w", i+1, err)
-        }
-    }
-
-    log.Printf("Created %d test clients", len(testClients))
-    return nil
-}
 
 // VerifyDatabaseConnection checks database connectivity
 func (d *Database) VerifyDatabaseConnection() error {
