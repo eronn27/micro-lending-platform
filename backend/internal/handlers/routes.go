@@ -132,9 +132,9 @@ func setupReportRoutes(rg *gin.RouterGroup, h *ReportHandler) {
 	{
 		reports.GET("/weekly", h.GetWeeklyReport)
 		reports.GET("/monthly", h.GetMonthlyReport)
+		reports.GET("/history", h.GetHistoricalReport)
 	}
 }
-
 // setupSystemRoutes configures system-level endpoints
 func setupSystemRoutes(router *gin.Engine) {
 	router.GET("/health", func(c *gin.Context) {

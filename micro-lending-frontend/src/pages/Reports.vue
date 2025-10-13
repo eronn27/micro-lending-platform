@@ -372,45 +372,33 @@ const toggleHistory = () => {
   }
 }
 
-const loadHistoricalData = () => {
-  // Generate mock historical data
-  // In production, this would call an API endpoint
-  const periods = parseInt(historyRange.value)
-  const data = []
-  
-  const now = new Date()
-  
-  for (let i = periods - 1; i >= 0; i--) {
-    const periodDate = new Date(now)
+const loadHistoricalData = async () => {
+  loading.value = true
+  try {
+    const response = await reportService.getHistoricalReport(
+      historyPeriod.value,
+      parseInt(historyRange.value)
+    )
     
-    if (historyPeriod.value === 'weekly') {
-      periodDate.setDate(periodDate.getDate() - (i * 7))
-      const weekEnd = new Date(periodDate)
-      weekEnd.setDate(periodDate.getDate() + 6)
-      
-      data.push({
-        period: `${formatDateShort(periodDate)} - ${formatDateShort(weekEnd)}`,
-        payments: Math.random() * 150000 + 50000,
-        releases: Math.random() * 200000 + 100000,
-        activeClients: Math.floor(Math.random() * 50 + 300),
-        overdueClients: Math.floor(Math.random() * 30 + 20),
-        netFlow: (Math.random() * 100000) - 50000
-      })
-    } else {
-      periodDate.setMonth(periodDate.getMonth() - i)
-      
-      data.push({
-        period: periodDate.toLocaleDateString('en-PH', { year: 'numeric', month: 'long' }),
-        payments: Math.random() * 600000 + 200000,
-        releases: Math.random() * 800000 + 400000,
-        activeClients: Math.floor(Math.random() * 50 + 300),
-        overdueClients: Math.floor(Math.random() * 30 + 20),
-        netFlow: (Math.random() * 400000) - 200000
-      })
-    }
+    // Map API response to component format
+    historicalData.value = response.data.map(record => ({
+      period: record.period,
+      payments: record.payments,
+      releases: record.releases,
+      activeClients: record.active_clients,
+      overdueClients: record.overdue_clients,
+      netFlow: record.net_flow
+    }))
+    
+    showNotification('Historical data loaded successfully')
+  } catch (error) {
+    console.error('Error loading historical data:', error)
+    showNotification('Failed to load historical data', 'error')
+    // Fallback to empty array on error
+    historicalData.value = []
+  } finally {
+    loading.value = false
   }
-  
-  historicalData.value = data
 }
 
 const getHistoryAverage = (field) => {

@@ -1,7 +1,7 @@
+// backend/internal/repositories/report_repository.go
 package repositories
 
 import (
-	"micro-lending-platform/backend/internal/models"
 	"gorm.io/gorm"
 	"time"
 )
@@ -14,138 +14,54 @@ func NewReportRepository(db *gorm.DB) *ReportRepository {
 	return &ReportRepository{db: db}
 }
 
-// GetWeeklyPaymentTotal calculates total payments for current week
-func (r *ReportRepository) GetWeeklyPaymentTotal() (float64, error) {
+// GetPaymentTotalForPeriod returns total payments within a date range
+func (r *ReportRepository) GetPaymentTotalForPeriod(startDate, endDate time.Time) (float64, error) {
 	var total float64
-	now := time.Now()
-	weekStart := now.AddDate(0, 0, -int(now.Weekday()))
-	
-	result := r.db.Model(&models.Payment{}).
-		Where("created_at >= ? AND status = ?", weekStart, "Paid").
+	err := r.db.Table("payments").
+		Where("status = ? AND created_at BETWEEN ? AND ?", "Paid", startDate, endDate).
+		Where("deleted_at IS NULL").
 		Select("COALESCE(SUM(amount_paid), 0)").
-		Scan(&total)
+		Scan(&total).Error
 	
-	return total, result.Error
+	return total, err
 }
 
-// GetWeeklyReleaseTotal calculates total loan releases for current week
-func (r *ReportRepository) GetWeeklyReleaseTotal() (float64, error) {
+// GetReleaseTotalForPeriod returns total loan releases within a date range
+func (r *ReportRepository) GetReleaseTotalForPeriod(startDate, endDate time.Time) (float64, error) {
 	var total float64
-	now := time.Now()
-	weekStart := now.AddDate(0, 0, -int(now.Weekday()))
-	
-	result := r.db.Model(&models.Loan{}).
-		Where("created_at >= ?", weekStart).
+	err := r.db.Table("loans").
+		Where("created_at BETWEEN ? AND ?", startDate, endDate).
+		Where("deleted_at IS NULL").
 		Select("COALESCE(SUM(amount_release), 0)").
-		Scan(&total)
+		Scan(&total).Error
 	
-	return total, result.Error
+	return total, err
 }
 
-// GetTotalClients returns total count of clients
-func (r *ReportRepository) GetTotalClients() (int64, error) {
+// GetActiveClientsForPeriod returns count of active clients at a specific date
+func (r *ReportRepository) GetActiveClientsForPeriod(endDate time.Time) (int64, error) {
 	var count int64
-	result := r.db.Model(&models.Client{}).
-		Where("deleted_at IS NULL").
-		Count(&count)
-	return count, result.Error
-}
-
-// GetActiveClients returns count of clients with active loans
-func (r *ReportRepository) GetActiveClients() (int64, error) {
-	var count int64
-	result := r.db.Model(&models.Client{}).
+	err := r.db.Table("clients").
 		Joins("INNER JOIN loans ON loans.client_id = clients.id").
-		Where("loans.status IN ? AND loans.deleted_at IS NULL", []string{"Active"}).
+		Where("loans.status IN (?)", []string{"Active", "Pending"}).
+		Where("loans.created_at <= ?", endDate).
+		Where("clients.deleted_at IS NULL AND loans.deleted_at IS NULL").
 		Distinct("clients.id").
-		Count(&count)
-	return count, result.Error
+		Count(&count).Error
+	
+	return count, err
 }
 
-// GetOverdueClients returns count of clients with overdue loans
-func (r *ReportRepository) GetOverdueClients() (int64, error) {
+// GetOverdueClientsForPeriod returns count of overdue clients at a specific date
+func (r *ReportRepository) GetOverdueClientsForPeriod(endDate time.Time) (int64, error) {
 	var count int64
-	result := r.db.Model(&models.Client{}).
+	err := r.db.Table("clients").
 		Joins("INNER JOIN loans ON loans.client_id = clients.id").
-		Where("loans.status IN ? AND loans.deleted_at IS NULL", []string{"Overdue", "Default"}).
+		Where("loans.status IN (?)", []string{"Overdue", "Default"}).
+		Where("loans.created_at <= ?", endDate).
+		Where("clients.deleted_at IS NULL AND loans.deleted_at IS NULL").
 		Distinct("clients.id").
-		Count(&count)
-	return count, result.Error
-}
-
-// GetActivePaymentTotal calculates total active payments (pending/partial)
-func (r *ReportRepository) GetActivePaymentTotal() (float64, error) {
-	var total float64
-	result := r.db.Model(&models.Payment{}).
-		Where("status IN ? AND deleted_at IS NULL", []string{"Pending", "Partial"}).
-		Select("COALESCE(SUM(amount_due), 0)").
-		Scan(&total)
+		Count(&count).Error
 	
-	return total, result.Error
-}
-
-// GetMonthlyPaymentTotal calculates total payments for current month
-func (r *ReportRepository) GetMonthlyPaymentTotal() (float64, error) {
-	var total float64
-	now := time.Now()
-	monthStart := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
-	
-	result := r.db.Model(&models.Payment{}).
-		Where("created_at >= ? AND status = ?", monthStart, "Paid").
-		Select("COALESCE(SUM(amount_paid), 0)").
-		Scan(&total)
-	
-	return total, result.Error
-}
-
-// GetMonthlyReleaseTotal calculates total loan releases for current month
-func (r *ReportRepository) GetMonthlyReleaseTotal() (float64, error) {
-	var total float64
-	now := time.Now()
-	monthStart := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
-	
-	result := r.db.Model(&models.Loan{}).
-		Where("created_at >= ?", monthStart).
-		Select("COALESCE(SUM(amount_release), 0)").
-		Scan(&total)
-	
-	return total, result.Error
-}
-
-// GetPaymentsByStatus returns count of payments by status
-func (r *ReportRepository) GetPaymentsByStatus(status string) (int64, error) {
-	var count int64
-	result := r.db.Model(&models.Payment{}).
-		Where("status = ? AND deleted_at IS NULL", status).
-		Count(&count)
-	return count, result.Error
-}
-
-// GetLoansByStatus returns count of loans by status
-func (r *ReportRepository) GetLoansByStatus(status string) (int64, error) {
-	var count int64
-	result := r.db.Model(&models.Loan{}).
-		Where("status = ? AND deleted_at IS NULL", status).
-		Count(&count)
-	return count, result.Error
-}
-
-// GetTotalOutstandingBalance returns total outstanding balance across all loans
-func (r *ReportRepository) GetTotalOutstandingBalance() (float64, error) {
-	var total float64
-	result := r.db.Model(&models.Loan{}).
-		Where("deleted_at IS NULL").
-		Select("COALESCE(SUM(outstanding_balance), 0)").
-		Scan(&total)
-	return total, result.Error
-}
-
-// GetTotalLoanAmount returns total amount of all loans
-func (r *ReportRepository) GetTotalLoanAmount() (float64, error) {
-	var total float64
-	result := r.db.Model(&models.Loan{}).
-		Where("deleted_at IS NULL").
-		Select("COALESCE(SUM(total_amount), 0)").
-		Scan(&total)
-	return total, result.Error
+	return count, err
 }
