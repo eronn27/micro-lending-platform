@@ -2,18 +2,10 @@
   <div class="reports-container">
     <!-- Header -->
     <header class="reports-header">
-<<<<<<< HEAD
       <!-- Left Section: Title -->
-      <div class="header-left">
-        <div class="header-content">
-          <h1>Reports & Analytics</h1>
-          <p class="subtitle">Weekly performance metrics and key statistics</p>
-        </div>
-=======
       <div class="header-content">
         <h1>Reports & Analytics</h1>
         <p class="subtitle">{{ getPeriodDescription() }}</p>
->>>>>>> upstream/main
       </div>
 
       <!-- Right Section: Actions -->
