@@ -11,10 +11,15 @@ import (
 
 type ClientHandler struct {
     clientService *services.ClientService
+    loanService   *services.LoanService  // Add loanService for payment management
 }
 
-func NewClientHandler(clientService *services.ClientService) *ClientHandler {
-    return &ClientHandler{clientService: clientService}
+// Update constructor to include loanService
+func NewClientHandler(clientService *services.ClientService, loanService *services.LoanService) *ClientHandler {
+    return &ClientHandler{
+        clientService: clientService,
+        loanService:   loanService,
+    }
 }
 
 // CheckDuplicate checks if a client with similar name already exists
@@ -119,7 +124,7 @@ func (h *ClientHandler) GetAllClients(c *gin.Context) {
     }
 
     c.JSON(http.StatusOK, gin.H{
-        "clients": clients,
+        "clients": clients,  // Make sure this includes loans
         "pagination": gin.H{
             "page":  page,
             "limit": limit,
@@ -324,4 +329,52 @@ func (h *ClientHandler) GetClientByControlNumber(c *gin.Context) {
     }
 
     c.JSON(http.StatusOK, client)
+}
+
+// GetClientsForPaymentManagement returns clients with active loans for payment management
+func (h *ClientHandler) GetClientsForPaymentManagement(c *gin.Context) {
+    clients, err := h.clientService.GetClientsWithActiveLoans()
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve clients for payment management"})
+        return
+    }
+
+    c.JSON(http.StatusOK, gin.H{
+        "clients": clients,
+        "total":   len(clients),
+    })
+}
+
+// GetClientsForPayments returns clients that need payment attention
+func (h *ClientHandler) GetClientsForPayments(c *gin.Context) {
+    clients, err := h.loanService.GetClientsForPayments()
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{
+            "error": "Failed to fetch clients for payments",
+            "details": err.Error(),
+        })
+        return
+    }
+
+    c.JSON(http.StatusOK, gin.H{
+        "clients": clients,
+        "total":   len(clients),
+    })
+}
+
+// GetClientPaymentOverview returns payment overview for all clients
+func (h *ClientHandler) GetClientPaymentOverview(c *gin.Context) {
+    clients, err := h.loanService.GetAllClientsWithLoans()
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{
+            "error": "Failed to fetch client payment overview",
+            "details": err.Error(),
+        })
+        return
+    }
+
+    c.JSON(http.StatusOK, gin.H{
+        "clients": clients,
+        "total":   len(clients),
+    })
 }

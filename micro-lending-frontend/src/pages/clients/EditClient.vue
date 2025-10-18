@@ -4,9 +4,12 @@
     <header class="page-header">
       <button @click="goBack" class="back-btn">← Cancel</button>
       <h1>Edit Client</h1>
-      <button @click="saveClient" class="save-btn" :disabled="saving">
-        {{ saving ? 'Saving...' : 'Save Changes' }}
-      </button>
+      <div class="header-actions">
+        <button @click="createNewLoan" class="create-loan-btn">+ Create New Loan</button>
+        <button @click="saveClient" class="save-btn" :disabled="saving">
+          {{ saving ? 'Saving...' : 'Save Changes' }}
+        </button>
+      </div>
     </header>
 
     <!-- Loading State -->
@@ -105,6 +108,7 @@
       <!-- Action Buttons -->
       <div class="action-buttons">
         <button @click="goBack" class="btn-secondary">Cancel</button>
+        <button @click="createNewLoan" class="btn-loan">Create New Loan</button>
         <button @click="saveClient" class="btn-primary" :disabled="saving">
           {{ saving ? 'Saving...' : 'Save Changes' }}
         </button>
@@ -169,6 +173,10 @@ const goBack = () => {
   router.push(`/clients/${route.params.id}`)
 }
 
+const createNewLoan = () => {
+  router.push(`/clients/${route.params.id}/new-loan`)
+}
+
 onMounted(() => {
   loadClient()
 })
@@ -198,25 +206,36 @@ onMounted(() => {
 .page-header h1 {
   margin: 0;
   color: #2c3e50;
+  flex: 1;
+  text-align: center;
 }
 
-.back-btn {
-  padding: 0.75rem 1.5rem;
-  background-color: #6c757d;
-  color: white;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
+.header-actions {
+  display: flex;
+  gap: 0.75rem;
 }
 
-.save-btn {
+.back-btn, .save-btn, .create-loan-btn {
   padding: 0.75rem 1.5rem;
-  background-color: #28a745;
-  color: white;
   border: none;
   border-radius: 6px;
   cursor: pointer;
   font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.back-btn {
+  background-color: #6c757d;
+  color: white;
+}
+
+.back-btn:hover {
+  background-color: #5a6268;
+}
+
+.save-btn {
+  background-color: #28a745;
+  color: white;
 }
 
 .save-btn:disabled {
@@ -224,12 +243,20 @@ onMounted(() => {
   cursor: not-allowed;
 }
 
-.back-btn:hover {
-  background-color: #5a6268;
-}
-
 .save-btn:hover:not(:disabled) {
   background-color: #218838;
+}
+
+.create-loan-btn {
+  background-color: #007bff;
+  color: white;
+  font-size: 0.95rem;
+}
+
+.create-loan-btn:hover {
+  background-color: #0056b3;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 123, 255, 0.3);
 }
 
 /* Form Styles */
@@ -357,7 +384,8 @@ onMounted(() => {
 }
 
 .btn-primary,
-.btn-secondary {
+.btn-secondary,
+.btn-loan {
   padding: 0.75rem 2rem;
   border: none;
   border-radius: 6px;
@@ -365,6 +393,7 @@ onMounted(() => {
   font-size: 1rem;
   font-weight: 600;
   min-width: 140px;
+  transition: all 0.2s ease;
 }
 
 .btn-primary {
@@ -377,12 +406,23 @@ onMounted(() => {
   color: white;
 }
 
+.btn-loan {
+  background-color: #007bff;
+  color: white;
+}
+
 .btn-primary:hover:not(:disabled) {
   background-color: #218838;
 }
 
 .btn-secondary:hover {
   background-color: #5a6268;
+}
+
+.btn-loan:hover {
+  background-color: #0056b3;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 123, 255, 0.3);
 }
 
 .btn-primary:disabled {
@@ -401,6 +441,11 @@ onMounted(() => {
     gap: 1rem;
     text-align: center;
   }
+
+  .header-actions {
+    width: 100%;
+    flex-direction: column;
+  }
   
   .form-grid {
     grid-template-columns: 1fr;
@@ -408,6 +453,12 @@ onMounted(() => {
   
   .action-buttons {
     flex-direction: column;
+  }
+
+  .btn-primary,
+  .btn-secondary,
+  .btn-loan {
+    width: 100%;
   }
 }
 </style>

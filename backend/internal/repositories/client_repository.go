@@ -219,11 +219,13 @@ func (r *ClientRepository) FindByControlNumber(controlNumber string) (*models.Cl
     return &client, nil
 }
 
-// FindAll retrieves all clients with pagination and search - FIXED TO INCLUDE LOANS
+// FindAll retrieves all clients with pagination and search - INCLUDE ALL LOANS
 func (r *ClientRepository) FindAll(offset, limit int, search string) ([]models.Client, error) {
     var clients []models.Client
     
-    query := r.db.Preload("Loans") // ADD THIS LINE TO PRELOAD LOANS
+    query := r.db.Preload("Loans", func(db *gorm.DB) *gorm.DB {
+        return db.Order("loans.created_at DESC") // Include ALL loans, not filtered
+    })
     
     // Add search filter if provided
     if search != "" {
@@ -244,7 +246,6 @@ func (r *ClientRepository) FindAll(offset, limit int, search string) ([]models.C
     }
     return clients, nil
 }
-
 // Search searches clients with more comprehensive criteria - FIXED TO INCLUDE LOANS
 func (r *ClientRepository) Search(query string, offset, limit int) ([]models.Client, error) {
     var clients []models.Client
@@ -371,4 +372,21 @@ func (r *ClientRepository) CreateSimple(client *models.Client) (*models.Client, 
         return nil, result.Error
     }
     return client, nil
+}
+
+// FindWithActiveLoans retrieves clients with their active loans
+func (r *ClientRepository) FindWithActiveLoans() ([]models.Client, error) {
+    var clients []models.Client
+
+    result := r.db.
+        Preload("Loans", "status IN ?", []string{"Active", "Overdue"}).
+        Where("EXISTS (SELECT 1 FROM loans WHERE loans.client_id = clients.id AND loans.status IN ?)",
+            []string{"Active", "Overdue"}).
+        Find(&clients)
+
+    if result.Error != nil {
+        return nil, result.Error
+    }
+
+    return clients, nil
 }
