@@ -3,9 +3,7 @@
     <!-- Header with Logo and Title -->
     <header class="page-header">
       <div class="logo-section">
-        <div class="logo-placeholder">
-          <span class="logo-text">MLP</span>
-        </div>
+        <img :src="companyLogo" alt="Company Logo" class="company-logo" />
         <h1>Client Search</h1>
       </div>
       <div class="header-actions">
@@ -239,6 +237,7 @@
 </template>
 
 <script setup>
+import companyLogo from '../../image/Screenshot 2025-01-14 131433.png'
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { api } from '../../services/api'
@@ -835,5 +834,16 @@ onMounted(() => {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+.company-logo {
+  width: 80px;      /* adjust to what looks best */
+  height: auto;
+  border-radius: 8px; /* optional – soft corners */
+}
+
+.logo-section {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 </style>

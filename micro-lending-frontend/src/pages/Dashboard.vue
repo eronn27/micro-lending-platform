@@ -4,7 +4,7 @@
         <header class="dashboard-header">
             <div class="header-content">
                 <div class="logo-title-container">
-                    <img src="/Screenshot 2025-01-14 131433.png" alt="Company Logo" class="company-logo" />
+                    <img src="../image/Screenshot 2025-01-14 131433.png" alt="Company Logo" class="company-logo" />
                     <h1 class="dashboard-title">Admin Dashboard</h1>
                 </div>
             </div>
