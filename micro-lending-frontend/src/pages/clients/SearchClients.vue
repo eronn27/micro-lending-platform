@@ -3,13 +3,7 @@
     <!-- Header with Logo and Title -->
     <header class="page-header">
       <div class="logo-section">
-<<<<<<< HEAD
         <img :src="companyLogo" alt="Company Logo" class="company-logo" />
-=======
-        <div class="logo-placeholder">
-	 <img src="../../../public/Logo.png" class="logo-placeholder" alt="Logo"> 
-        </div>
->>>>>>> upstream/main
         <h1>Client Search</h1>
       </div>
       <div class="header-actions">
