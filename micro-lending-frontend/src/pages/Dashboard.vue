@@ -17,7 +17,7 @@
         <!-- Main Content -->
         <main class="dashboard-main">
             <div class="welcome-section">
-                <h2>Welcome Back</h2>
+                <h2>Welcome</h2>
                 <p>What would you like to do today?</p>
             </div>
 
