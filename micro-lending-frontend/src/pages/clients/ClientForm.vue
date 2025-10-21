@@ -211,15 +211,39 @@
               </div>
             </div>
 
+            <!-- MODIFIED: Home Address with San Antonio Filter -->
             <div class="form-group">
               <label for="homeAddress">Home Address *</label>
-              <textarea
-                id="homeAddress"
-                v-model="client.home_address"
-                required
-                rows="3"
-                :disabled="submitting"
-              ></textarea>
+              <div class="address-input-group">
+                <select 
+                  v-model="selectedBarangay" 
+                  @change="updateHomeAddress"
+                  class="address-select"
+                  :disabled="submitting"
+                  required
+                >
+                  <option value="">Select Barangay *</option>
+                  <option 
+                    v-for="barangay in sanAntonioBarangays" 
+                    :key="barangay.value" 
+                    :value="barangay.value"
+                  >
+                    {{ barangay.label }}
+                  </option>
+                </select>
+                <input
+                  v-model="streetAddress"
+                  @input="updateHomeAddress"
+                  type="text"
+                  placeholder="Enter street, house number, or additional details"
+                  class="street-input"
+                  :disabled="submitting"
+                >
+              </div>
+              <div class="address-preview" v-if="client.home_address">
+                <strong>Complete Address:</strong>
+                <span class="preview-text">{{ client.home_address }}</span>
+              </div>
             </div>
 
             <div class="form-row">
@@ -1016,6 +1040,33 @@ const loanCalculator = reactive({
 const loanCalculationResult = ref(null);
 const loanCalculationApplied = ref(false);
 
+// NEW: San Antonio Barangays Data
+const selectedBarangay = ref('');
+const streetAddress = ref('');
+
+const sanAntonioBarangays = ref([
+  { value: 'barbaza', label: 'Barbaza' },
+  { value: 'buliran', label: 'Buliran' },
+  { value: 'cama_juan', label: 'Cama Juan' },
+  { value: 'julio', label: 'Julio' },
+  { value: 'lawang_kupang', label: 'Lawang Kupang' },
+  { value: 'luyos', label: 'Luyos' },
+  { value: 'maugat', label: 'Maugat' },
+  { value: 'panabingan', label: 'Panabingan' },
+  { value: 'poblacion', label: 'Poblacion' },
+  { value: 'santo_cristo', label: 'Santo Cristo' },
+  { value: 'santo_rosario', label: 'Santo Rosario' },
+  { value: 'sapang_buhangin', label: 'Sapang Buhangin' },
+  { value: 'san_roque', label: 'San Roque' },
+  { value: 'san_isidro', label: 'San Isidro' },
+  { value: 'san_jose', label: 'San Jose' },
+  { value: 'san_mariano', label: 'San Mariano' },
+  { value: 'san_nicolas', label: 'San Nicolas' },
+  { value: 'sikat', label: 'Sikat' },
+  { value: 'tikiw', label: 'Tikiw' },
+  { value: 'pulo', label: 'Pulo' }
+]);
+
 // Client Form Data
 const client = reactive({
   first_name: '',
@@ -1088,7 +1139,8 @@ const duplicateCheckTimeout = ref(null);
 // Computed Properties
 const isFormValid = computed(() => {
   return client.first_name && client.last_name && client.contact_number && 
-         client.home_address && loan.total_amount > 0 && loan.terms > 0 && 
+         client.home_address && client.home_address.trim() !== '' && // ADDED address validation
+         loan.total_amount > 0 && loan.terms > 0 && 
          loan.ammortization > 0 && loan.amount_release >= 0;
 });
 
@@ -1102,6 +1154,21 @@ const formatCurrency = (amount) => {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
   }).format(amount);
+};
+
+// NEW: Update home address method
+const updateHomeAddress = () => {
+  if (selectedBarangay.value && streetAddress.value) {
+    const barangay = sanAntonioBarangays.value.find(b => b.value === selectedBarangay.value);
+    client.home_address = `${streetAddress.value}, ${barangay.label}, San Antonio, Nueva Ecija`;
+  } else if (selectedBarangay.value) {
+    const barangay = sanAntonioBarangays.value.find(b => b.value === selectedBarangay.value);
+    client.home_address = `${barangay.label}, San Antonio, Nueva Ecija`;
+  } else if (streetAddress.value) {
+    client.home_address = `${streetAddress.value}, San Antonio, Nueva Ecija`;
+  } else {
+    client.home_address = '';
+  }
 };
 
 const calculateLoanDetails = () => {
@@ -1134,7 +1201,7 @@ const applyLoanCalculation = () => {
   loan.deductions = result.deductionType;
   loan.amount_release = result.amountRelease;
   loan.mode = 'Weekly';
-  loan.payment_period_weeks = result.numberOfWeeks; // ADD THIS LINE 
+  loan.payment_period_weeks = result.numberOfWeeks;
 
   loanCalculationApplied.value = true;
 };
@@ -1325,6 +1392,61 @@ watch([() => client.first_name, () => client.last_name], () => {
   padding: 2rem;
   border-radius: 8px;
   box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+/* NEW: Address Input Styles */
+.address-input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.address-select,
+.street-input {
+  padding: 0.75rem;
+  border: 2px solid #e9ecef;
+  border-radius: 6px;
+  font-size: 1rem;
+  transition: border-color 0.2s ease;
+}
+
+.address-select {
+  background-color: white;
+  cursor: pointer;
+}
+
+.address-select:focus,
+.street-input:focus {
+  outline: none;
+  border-color: #007bff;
+  box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+}
+
+.street-input::placeholder {
+  color: #6c757d;
+  opacity: 0.7;
+}
+
+.address-preview {
+  margin-top: 0.75rem;
+  padding: 1rem;
+  background-color: #f8f9fa;
+  border-radius: 6px;
+  border: 1px solid #e9ecef;
+}
+
+.address-preview strong {
+  display: block;
+  margin-bottom: 0.5rem;
+  color: #495057;
+  font-size: 0.9rem;
+}
+
+.preview-text {
+  color: #2c3e50;
+  font-size: 1rem;
+  line-height: 1.4;
 }
 
 /* Calculator Specific Styles */
@@ -1632,6 +1754,26 @@ watch([() => client.first_name, () => client.last_name], () => {
   .btn-primary,
   .btn-secondary {
     width: 100%;
+  }
+
+  /* NEW: Responsive address inputs */
+  .address-input-group {
+    flex-direction: column;
+  }
+}
+
+@media (min-width: 769px) {
+  /* NEW: Desktop address inputs */
+  .address-input-group {
+    flex-direction: row;
+  }
+  
+  .address-select {
+    flex: 0 0 200px;
+  }
+  
+  .street-input {
+    flex: 1;
   }
 }
 </style>
